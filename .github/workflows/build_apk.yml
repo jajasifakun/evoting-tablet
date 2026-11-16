@@ -28,10 +28,18 @@ jobs:
         run: |
           cp pubspec.yaml pubspec.yaml.bak
           rm -rf android
-          flutter create . --platforms=android --org com.evoting
+          flutter create --project-name=evoting_karangmukti --platforms=android --org com.evoting .
           cp pubspec.yaml.bak pubspec.yaml
-          # Tambahkan izin kamera di AndroidManifest
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />' android/app/src/main/AndroidManifest.xml
+          python3 -c '
+          path = "android/app/src/main/AndroidManifest.xml"
+          with open(path, "r") as f:
+              content = f.read()
+          permission = "    <uses-permission android:name=\"android.permission.CAMERA\" />\n    <uses-feature android:name=\"android.hardware.camera\" android:required=\"false\" />\n"
+          if "android.permission.CAMERA" not in content:
+              content = content.replace("<application", permission + "    <application")
+          with open(path, "w") as f:
+              f.write(content)
+          '
 
       - name: Get Dependencies
         run: flutter pub get
