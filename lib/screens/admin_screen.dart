@@ -79,7 +79,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDanger ? Colors.red : Colors.black86)),
+        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDanger ? Colors.red : Colors.black87)),
         content: Text(message),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
@@ -308,7 +308,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               ),
               if (v.hasVoted) ...[
                 IconButton(
-                  icon: const Icon(Icons.arrow_counterclockwise, color: Colors.amber),
+                  icon: const Icon(Icons.refresh, color: Colors.amber),
                   tooltip: 'Reset Pemilih Ini',
                   onPressed: () async {
                     await DatabaseHelper.instance.resetIndividualVoter(v.id);
@@ -366,7 +366,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               ),
               if (isUsed) ...[
                 IconButton(
-                  icon: const Icon(Icons.arrow_counterclockwise, color: Colors.amber),
+                  icon: const Icon(Icons.refresh, color: Colors.amber),
                   tooltip: 'Reset Token Ini',
                   onPressed: () async {
                     await DatabaseHelper.instance.resetIndividualToken(t['token_code']);
@@ -440,7 +440,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    icon: const Icon(Icons.arrow_counterclockwise),
+                    icon: const Icon(Icons.refresh),
                     label: const Text('Reset Pemilih & QR Saja', style: TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: _handleResetVotersOnly,
                   ),
@@ -471,7 +471,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                 const SizedBox(height: 8),
                 const Text(
                   'Mengosongkan kotak suara kembali ke 0 suara, menghapus seluruh rekaman coblosan simulasi, dan mengaktifkan kembali seluruh DPT serta QR Code.',
-                  style: TextStyle(fontSize: 13, color: Colors.black86),
+                  style: TextStyle(fontSize: 13, color: Colors.black87),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(

@@ -106,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.fullscreen, color: Colors.slate),
+            icon: const Icon(Icons.fullscreen, color: Colors.blueGrey),
             tooltip: 'Layar Penuh',
             onPressed: () {
               SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
