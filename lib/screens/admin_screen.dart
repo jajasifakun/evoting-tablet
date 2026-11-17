@@ -553,29 +553,59 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
           const SizedBox(height: 20),
 
-          // Tombol Buka Lembar Undangan Penuh
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 2,
+          // Tombol Aksi Undangan
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo.shade700,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 2,
+                    ),
+                    icon: const Icon(Icons.print),
+                    label: const Text(
+                      'BUKA & CETAK 10 UNDANGAN',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const InvitationScreen()),
+                      );
+                    },
+                  ),
+                ),
               ),
-              icon: const Icon(Icons.print),
-              label: const Text(
-                'BUKA & CETAK 10 SURAT UNDANGAN (PANDUAN JEMPOL)',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 2,
+                    ),
+                    icon: const Icon(Icons.download),
+                    label: const Text(
+                      'DOWNLOAD SURAT UNDANGAN',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const InvitationScreen()),
+                      );
+                    },
+                  ),
+                ),
               ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const InvitationScreen()),
-                );
-              },
-            ),
+            ],
           ),
 
           const SizedBox(height: 24),

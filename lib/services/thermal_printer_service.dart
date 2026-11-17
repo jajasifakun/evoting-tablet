@@ -60,6 +60,19 @@ class ThermalPrinterService {
     }
   }
 
+  /// Simpan file biner (gambar kartu undangan / struk) ke folder Download perangkat Android
+  Future<bool> saveToDownloads(String fileName, Uint8List bytes) async {
+    try {
+      final bool? success = await _channel.invokeMethod('saveToDownloads', {
+        'fileName': fileName,
+        'bytes': bytes,
+      });
+      return success == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Format dan kirim cetak struk bukti memilih (VVPAT) ke kotak suara fisik
   Future<bool> printVoteReceipt({
     required String candidateName,

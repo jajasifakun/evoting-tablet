@@ -1,6 +1,9 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../data/database_helper.dart';
+import '../services/thermal_printer_service.dart';
 
 class InvitationScreen extends StatefulWidget {
   const InvitationScreen({super.key});
@@ -10,8 +13,10 @@ class InvitationScreen extends StatefulWidget {
 }
 
 class _InvitationScreenState extends State<InvitationScreen> {
+  final GlobalKey _cardKey = GlobalKey();
   List<Map<String, dynamic>> _voterCards = [];
   bool _isLoading = true;
+  bool _isDownloading = false;
   int _selectedIndex = 0;
 
   @override
@@ -29,6 +34,126 @@ class _InvitationScreenState extends State<InvitationScreen> {
     });
   }
 
+  Future<void> _downloadCurrentCard() async {
+    if (_voterCards.isEmpty) return;
+    setState(() => _isDownloading = true);
+
+    try {
+      final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception("Card boundary null");
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final bytes = byteData!.buffer.asUint8List();
+
+      final current = _voterCards[_selectedIndex];
+      final voterName = current['voter_name'] ?? 'Pemilih';
+      final cleanName = voterName.toString().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final fileName = 'Surat_Undangan_C6_${_selectedIndex + 1}_$cleanName.png';
+
+      final ok = await ThermalPrinterService.instance.saveToDownloads(fileName, bytes);
+
+      if (!mounted) return;
+      setState(() => _isDownloading = false);
+
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(ok ? Icons.check_circle : Icons.error, color: ok ? Colors.green : Colors.red, size: 28),
+              const SizedBox(width: 8),
+              Text(ok ? 'Berhasil Diunduh!' : 'Gagal Mengunduh', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Surat Undangan C-6 untuk pemilih $voterName berhasil disimpan ke memori tablet.', style: const TextStyle(fontSize: 13.5)),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
+                child: Text('📁 Lokasi: Folder Download\n📄 File: $fileName', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isDownloading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan saat mengunduh: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _downloadAllCards() async {
+    if (_voterCards.isEmpty) return;
+    setState(() => _isDownloading = true);
+
+    int saved = 0;
+    for (int i = 0; i < _voterCards.length; i++) {
+      setState(() => _selectedIndex = i);
+      await WidgetsBinding.instance.endOfFrame;
+      await Future.delayed(const Duration(milliseconds: 150));
+
+      final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary != null) {
+        final image = await boundary.toImage(pixelRatio: 3.0);
+        final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+        if (byteData != null) {
+          final bytes = byteData.buffer.asUint8List();
+          final current = _voterCards[i];
+          final voterName = current['voter_name'] ?? 'Pemilih';
+          final cleanName = voterName.toString().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+          final fileName = 'Surat_Undangan_C6_${i + 1}_$cleanName.png';
+
+          final ok = await ThermalPrinterService.instance.saveToDownloads(fileName, bytes);
+          if (ok) saved++;
+        }
+      }
+    }
+
+    if (!mounted) return;
+    setState(() => _isDownloading = false);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 28),
+            SizedBox(width: 8),
+            Text('Unduh Massal Selesai!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Text(
+          'Sebanyak $saved dari ${_voterCards.length} berkas Surat Undangan (C-6 KWK) dengan Barcode & Panduan Posisi Jempol berhasil disimpan ke folder Download tablet!',
+          style: const TextStyle(fontSize: 13.5),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -40,6 +165,45 @@ class _InvitationScreenState extends State<InvitationScreen> {
           'Surat Undangan Barcode (Model C-6)',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
+        actions: [
+          IconButton(
+            icon: _isDownloading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.download),
+            tooltip: 'Download Surat Undangan Ini (PNG)',
+            onPressed: _isDownloading ? null : _downloadCurrentCard,
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Pilihan Unduh',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (val) {
+              if (val == 'single') _downloadCurrentCard();
+              if (val == 'all') _downloadAllCards();
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'single',
+                child: Row(
+                  children: [
+                    Icon(Icons.download, color: Colors.indigo, size: 20),
+                    SizedBox(width: 8),
+                    Text('Download Surat Ini (PNG)'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'all',
+                child: Row(
+                  children: [
+                    Icon(Icons.download_for_offline, color: Colors.green, size: 20),
+                    SizedBox(width: 8),
+                    Text('Download Semua (10 Surat)'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -112,7 +276,45 @@ class _InvitationScreenState extends State<InvitationScreen> {
                         child: Center(
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 620),
-                            child: _buildInvitationCard(_voterCards[_selectedIndex]),
+                            child: Column(
+                              children: [
+                                // Tombol Download Cepat
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.indigo.shade700,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.download, size: 18),
+                                      label: const Text('Download Surat Ini (PNG)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                      onPressed: _isDownloading ? null : _downloadCurrentCard,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.indigo.shade800,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.download_for_offline, size: 18),
+                                      label: const Text('Download Semua (10 Surat)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                      onPressed: _isDownloading ? null : _downloadAllCards,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+
+                                // Kartu Undangan yang Ditangkap untuk Download
+                                RepaintBoundary(
+                                  key: _cardKey,
+                                  child: _buildInvitationCard(_voterCards[_selectedIndex]),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

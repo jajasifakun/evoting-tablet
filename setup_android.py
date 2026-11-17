@@ -162,6 +162,42 @@ class MainActivity: FlutterActivity() {
                 "isConnected" -> {
                     result.success(bluetoothSocket?.isConnected ?: false)
                 }
+                "saveToDownloads" -> {
+                    val fileName = call.argument<String>("fileName") ?: "Surat_Undangan.png"
+                    val bytes = call.argument<ByteArray>("bytes")
+                    if (bytes != null) {
+                        try {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                val values = android.content.ContentValues().apply {
+                                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                                }
+                                val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                                if (uri != null) {
+                                    contentResolver.openOutputStream(uri)?.use { os ->
+                                        os.write(bytes)
+                                        os.flush()
+                                    }
+                                    result.success(true)
+                                    return@setMethodCallHandler
+                                }
+                            } else {
+                                val file = java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), fileName)
+                                file.outputStream().use { os ->
+                                    os.write(bytes)
+                                    os.flush()
+                                }
+                                result.success(true)
+                                return@setMethodCallHandler
+                            }
+                        } catch (e: Exception) {
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
+                    }
+                    result.success(false)
+                }
                 else -> result.notImplemented()
             }
         }
