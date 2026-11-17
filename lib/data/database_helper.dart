@@ -239,14 +239,14 @@ class DatabaseHelper {
     };
   }
 
-  Future<bool> castVote(String tokenCode, int candidateId) async {
+  Future<Map<String, dynamic>> castVote(String tokenCode, int candidateId) async {
     final db = await instance.database;
 
     return await db.transaction((txn) async {
       // 1. Validasi token status di transaksi
       final tokenRes = await txn.query('voter_tokens', where: 'token_code = ? AND status = ?', whereArgs: [tokenCode, 'unused']);
       if (tokenRes.isEmpty) {
-        return false;
+        return {'success': false, 'message': 'Token sudah digunakan atau tidak berlaku.'};
       }
 
       final tokenData = tokenRes.first;
@@ -285,7 +285,10 @@ class DatabaseHelper {
         'created_at': nowStr,
       });
 
-      return true;
+      return {
+        'success': true,
+        'voteHash': voteHash,
+      };
     });
   }
 

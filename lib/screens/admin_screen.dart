@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../data/database_helper.dart';
+import '../services/thermal_printer_service.dart';
+import 'invitation_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -16,13 +18,23 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   int _votedCount = 0;
   List<Voter> _votersList = [];
   List<Map<String, dynamic>> _tokensList = [];
+  List<Map<String, String>> _pairedPrinters = [];
+  bool _isConnectingPrinter = false;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _loadAllData();
+    _loadPairedPrinters();
+  }
+
+  Future<void> _loadPairedPrinters() async {
+    final list = await ThermalPrinterService.instance.getPairedDevices();
+    if (mounted) {
+      setState(() => _pairedPrinters = list);
+    }
   }
 
   Future<void> _loadAllData() async {
@@ -115,6 +127,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           controller: _tabController,
           indicatorColor: Colors.amber,
           indicatorWeight: 3,
+          isScrollable: true,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
@@ -122,6 +135,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             Tab(icon: Icon(Icons.bar_chart), text: 'Rekap Suara'),
             Tab(icon: Icon(Icons.people), text: 'Daftar DPT (10)'),
             Tab(icon: Icon(Icons.qr_code_2), text: 'Token QR'),
+            Tab(icon: Icon(Icons.mail_outline), text: 'Undangan & Barcode'),
+            Tab(icon: Icon(Icons.print), text: 'Printer Thermal'),
             Tab(icon: Icon(Icons.settings_backup_restore), text: 'Reset Simulasi'),
           ],
         ),
@@ -134,6 +149,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                 _buildRecapTab(),
                 _buildVotersTab(),
                 _buildTokensTab(),
+                _buildInvitationTab(),
+                _buildThermalPrinterTab(),
                 _buildResetTab(),
               ],
             ),
@@ -491,6 +508,365 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // --- TAB 4: SURAT UNDANGAN & BARCODE DENGAN PANDUAN JEMPOL ---
+  Widget _buildInvitationTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.indigo.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.indigo.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.mark_email_read, color: Colors.indigo.shade800, size: 36),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Surat Undangan Pemilih (Model C-6 KWK)',
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.indigo.shade900),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Dilengkapi Barcode otorisasi dan PANDUAN POSISI JEMPOL agar pemilih memegang kartu di tempat yang tepat sehingga scan kamera bilik berlangsung cepat.',
+                        style: TextStyle(fontSize: 12.5, color: Color(0xFF1E293B), height: 1.3),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Tombol Buka Lembar Undangan Penuh
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.indigo.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 2,
+              ),
+              icon: const Icon(Icons.print),
+              label: const Text(
+                'BUKA & CETAK 10 SURAT UNDANGAN (PANDUAN JEMPOL)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const InvitationScreen()),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          const Text(
+            'DAFTAR KARTU UNDANGAN PEMILIH (10 DPT):',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 12),
+
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _tokensList.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (ctx, idx) {
+              final t = _tokensList[idx];
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.indigo.shade100,
+                      foregroundColor: Colors.indigo.shade900,
+                      child: Text('${idx + 1}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(t['voter_name'] ?? 'Pemilih Lepas', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text('NIK: ${t['voter_nik'] ?? "-"} • Token: ${t['token_code']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo.shade50,
+                        foregroundColor: Colors.indigo.shade700,
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.visibility, size: 16),
+                      label: const Text('Lihat C-6', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const InvitationScreen()),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- TAB 5: PENGATURAN PRINTER THERMAL KOTAK SUARA ---
+  Widget _buildThermalPrinterTab() {
+    final printer = ThermalPrinterService.instance;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Banner Status
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: printer.connectedPrinterName != null ? Colors.green.shade50 : Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: printer.connectedPrinterName != null ? Colors.green.shade300 : Colors.amber.shade300),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  printer.connectedPrinterName != null ? Icons.print : Icons.print_disabled,
+                  color: printer.connectedPrinterName != null ? Colors.green.shade800 : Colors.amber.shade900,
+                  size: 36,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        printer.connectedPrinterName != null
+                            ? 'Printer Terhubung: ${printer.connectedPrinterName}'
+                            : 'Printer Thermal Belum Terhubung',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          color: printer.connectedPrinterName != null ? Colors.green.shade900 : Colors.amber.shade900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        printer.connectedPrinterName != null
+                            ? 'Struk bukti coblos fisik akan otomatis dicetak saat pemilih menekan YA di bilik suara.'
+                            : 'Aplikasi berjalan dalam mode Simulasi Layar (struk digital ditampilkan di layar tablet & bisa dicetak jika printer Bluetooth dihubungkan).',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.3),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Switch Otomatis Cetak
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Cetak Otomatis Struk ke Kotak Suara', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    SizedBox(height: 2),
+                    Text('Keluarkan struk fisik sesaat setelah pemilih mencoblos', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+                Switch(
+                  value: printer.autoPrintEnabled,
+                  activeColor: Colors.green.shade700,
+                  onChanged: (val) {
+                    setState(() => printer.autoPrintEnabled = val);
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Tombol Aksi Uji Coba & Scan
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.bluetooth_searching),
+                  label: const Text('Cari Printer Bluetooth', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: _loadPairedPrinters,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.receipt_long),
+                  label: const Text('Test Cetak Struk Contoh', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: () async {
+                    final ok = await printer.printTestReceipt();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(ok ? 'Perintah cetak terkirim ke printer thermal!' : 'Printer belum terhubung via Bluetooth.'),
+                        backgroundColor: ok ? Colors.green : Colors.orange,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+
+          const Text(
+            'DAFTAR PERANGKAT BLUETOOTH TERPASANG (PAIRED):',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Pastikan printer thermal kasir kecil (58mm/80mm) sudah Anda pasangkan (pair) di menu Bluetooth tablet/HP terlebih dahulu.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+
+          if (_pairedPrinters.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: const Center(
+                child: Text(
+                  'Belum ada printer Bluetooth terdeteksi.\nBuka Pengaturan Bluetooth tablet/HP, nyalakan printer thermal, dan pasangkan (pair) printer Anda.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12.5, color: Colors.grey, height: 1.4),
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _pairedPrinters.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (ctx, idx) {
+                final p = _pairedPrinters[idx];
+                final name = p['name'] ?? 'Printer Thermal';
+                final addr = p['address'] ?? '';
+                final isConnected = printer.connectedPrinterAddress == addr;
+
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isConnected ? Colors.green : Colors.grey.shade200, width: isConnected ? 2 : 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.print, color: isConnected ? Colors.green : Colors.indigo),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            Text(addr, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      if (isConnected)
+                        OutlinedButton(
+                          onPressed: () async {
+                            await printer.disconnect();
+                            setState(() {});
+                          },
+                          child: const Text('Putuskan'),
+                        )
+                      else
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.indigo.shade600,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: _isConnectingPrinter
+                              ? null
+                              : () async {
+                                  setState(() => _isConnectingPrinter = true);
+                                  final ok = await printer.connect(addr, name);
+                                  setState(() => _isConnectingPrinter = false);
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(ok ? 'Berhasil terhubung ke $name!' : 'Gagal menghubungkan ke $name.'),
+                                      backgroundColor: ok ? Colors.green : Colors.red,
+                                    ),
+                                  );
+                                },
+                          child: const Text('Hubungkan'),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
         ],
       ),
     );

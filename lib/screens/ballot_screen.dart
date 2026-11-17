@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/models.dart';
 import '../data/database_helper.dart';
+import '../services/thermal_printer_service.dart';
 import 'success_screen.dart';
 
 class BallotScreen extends StatefulWidget {
@@ -138,22 +140,205 @@ class _BallotScreenState extends State<BallotScreen> {
   }
 
   Future<void> _executeVote(Candidate candidate) async {
-    final success = await DatabaseHelper.instance.castVote(widget.token.tokenCode, candidate.id);
+    final result = await DatabaseHelper.instance.castVote(widget.token.tokenCode, candidate.id);
     if (!mounted) return;
 
-    if (success) {
+    if (result['success'] == true) {
+      final voteHash = result['voteHash'] as String? ?? 'HASH-OK';
+
+      // 1. Kirim cetak otomatis ke Printer Thermal (jika terhubung Bluetooth)
+      if (ThermalPrinterService.instance.autoPrintEnabled) {
+        ThermalPrinterService.instance.printVoteReceipt(
+          candidateName: candidate.name,
+          candidateLetter: candidate.letter,
+          candidateNumber: candidate.orderNumber,
+          tokenCode: widget.token.tokenCode,
+          voteHash: voteHash,
+          voterName: widget.voter?.name,
+          voterNik: widget.voter?.nik,
+        );
+      }
+
+      // 2. Tampilkan dialog bukti fisik & instruksi memasukkan ke Kotak Suara
+      await _showReceiptModal(candidate, voteHash);
+
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const SuccessScreen()),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal menyimpan suara. Token sudah tidak berlaku.'),
+        SnackBar(
+          content: Text(result['message'] ?? 'Gagal menyimpan suara. Token sudah tidak berlaku.'),
           backgroundColor: Colors.red,
         ),
       );
     }
+  }
+
+  Future<void> _showReceiptModal(Candidate candidate, String voteHash) async {
+    final now = DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now());
+    final shortHash = voteHash.length > 20 ? '${voteHash.substring(0, 10)}...${voteHash.substring(voteHash.length - 10)}' : voteHash;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(20),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Animasi / Ikon Printer
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.green.shade300),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.print, color: Colors.green.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'STRUK BUKTI PEMILIHAN DICETAK',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.green.shade900),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // KERTAS STRUK THERMAL SIMULASI
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFAFAFA),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade400, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Center(
+                      child: Text(
+                        'PILKADES KARANG MUKTI 2026',
+                        style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w900, fontSize: 13),
+                      ),
+                    ),
+                    const Center(
+                      child: Text(
+                        'KEC. CIPEUNDEUY - KAB. SUBANG',
+                        style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: Colors.grey),
+                      ),
+                    ),
+                    const Divider(thickness: 1, height: 16),
+                    const Center(
+                      child: Text(
+                        'BUKTI PEMUNGUTAN SUARA FISIK (VVPAT)',
+                        style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 11),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('TPS      : TPS 01 DESA KARANG MUKTI', style: const TextStyle(fontFamily: 'monospace', fontSize: 10.5)),
+                    Text('WAKTU    : $now WIB', style: const TextStyle(fontFamily: 'monospace', fontSize: 10.5)),
+                    Text('TOKEN QR : ${widget.token.tokenCode}', style: const TextStyle(fontFamily: 'monospace', fontSize: 10.5)),
+                    if (widget.voter != null)
+                      Text('PEMILIH  : ${widget.voter!.name}', style: const TextStyle(fontFamily: 'monospace', fontSize: 10.5)),
+                    const Divider(thickness: 1, height: 16),
+                    Center(
+                      child: Column(
+                        children: [
+                          const Text('PILIHAN ANDA TELAH TERCATAT:', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5)),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(color: Colors.indigo.shade50, borderRadius: BorderRadius.circular(6)),
+                            child: Text(
+                              'CALON ${candidate.letter} (No. ${candidate.orderNumber})\n${candidate.name}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w900, fontSize: 12.5, color: Colors.indigo.shade900),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Kode Hash: $shortHash', style: const TextStyle(fontFamily: 'monospace', fontSize: 9.5, color: Colors.grey)),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // INSTRUKSI KOTAK SUARA FISIK (PENTING)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.shade700, width: 2),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.inventory_2, color: Colors.amber.shade900, size: 28),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'PETUNJUK PEMILIH:',
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Colors.amber.shade900),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Ambil struk kertas yang keluar dari printer kecil, lalu segera masukkan ke dalam KOTAK SUARA FISIK.',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF451A03), height: 1.3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Tombol Konfirmasi Telah Masuk Kotak Suara
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.check_circle),
+                  label: const Text(
+                    'SAYA SUDAH MEMASUKKAN KE KOTAK SUARA',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override

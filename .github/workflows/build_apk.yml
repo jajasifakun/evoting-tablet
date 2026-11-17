@@ -31,14 +31,123 @@ jobs:
           flutter create --project-name=evoting_karangmukti --platforms=android --org com.evoting .
           cp pubspec.yaml.bak pubspec.yaml
           python3 -c '
+          import os
+
+          # 1. Update AndroidManifest.xml dengan Izin Kamera dan Bluetooth
           path = "android/app/src/main/AndroidManifest.xml"
           with open(path, "r") as f:
               content = f.read()
-          permission = "    <uses-permission android:name=\"android.permission.CAMERA\" />\n    <uses-feature android:name=\"android.hardware.camera\" android:required=\"false\" />\n"
+          perms = """    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+"""
           if "android.permission.CAMERA" not in content:
-              content = content.replace("<application", permission + "    <application")
+              content = content.replace("<application", perms + "    <application")
           with open(path, "w") as f:
               f.write(content)
+
+          # 2. Update MainActivity.kt dengan Native Bluetooth ESC/POS Channel
+          kt_code = """package com.evoting.evoting_karangmukti
+
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothSocket
+import java.io.OutputStream
+import java.util.UUID
+
+class MainActivity: FlutterActivity() {
+    private val CHANNEL = "com.evoting/thermal_printer"
+    private var bluetoothSocket: BluetoothSocket? = null
+    private var outputStream: OutputStream? = null
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getPairedDevices" -> {
+                    try {
+                        val adapter = BluetoothAdapter.getDefaultAdapter()
+                        if (adapter == null || !adapter.isEnabled) {
+                            result.success(emptyList<Map<String, String>>())
+                            return@setMethodCallHandler
+                        }
+                        val devices = adapter.bondedDevices.map { device ->
+                            mapOf("name" to (device.name ?: "Unknown"), "address" to device.address)
+                        }
+                        result.success(devices)
+                    } catch (e: Exception) {
+                        result.success(emptyList<Map<String, String>>())
+                    }
+                }
+                "connect" -> {
+                    val address = call.argument<String>("address")
+                    val adapter = BluetoothAdapter.getDefaultAdapter()
+                    val device = adapter?.getRemoteDevice(address)
+                    if (device != null) {
+                        Thread {
+                            try {
+                                outputStream?.close()
+                                bluetoothSocket?.close()
+                                val sppUuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+                                bluetoothSocket = device.createRfcommSocketToServiceRecord(sppUuid)
+                                bluetoothSocket?.connect()
+                                outputStream = bluetoothSocket?.outputStream
+                                runOnUiThread { result.success(true) }
+                            } catch (e: Exception) {
+                                outputStream = null
+                                bluetoothSocket = null
+                                runOnUiThread { result.success(false) }
+                            }
+                        }.start()
+                    } else {
+                        result.success(false)
+                    }
+                }
+                "printRaw" -> {
+                    val bytes = call.argument<ByteArray>("bytes")
+                    if (outputStream != null && bytes != null) {
+                        Thread {
+                            try {
+                                outputStream?.write(bytes)
+                                outputStream?.flush()
+                                runOnUiThread { result.success(true) }
+                            } catch (e: Exception) {
+                                runOnUiThread { result.success(false) }
+                            }
+                        }.start()
+                    } else {
+                        result.success(false)
+                    }
+                }
+                "disconnect" -> {
+                    try {
+                        outputStream?.close()
+                        bluetoothSocket?.close()
+                    } catch (e: Exception) {}
+                    outputStream = null
+                    bluetoothSocket = null
+                    result.success(true)
+                }
+                "isConnected" -> {
+                    result.success(bluetoothSocket?.isConnected ?: false)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+}
+"""
+          for root, dirs, files in os.walk("android"):
+              if "MainActivity.kt" in files:
+                  with open(os.path.join(root, "MainActivity.kt"), "w") as f:
+                      f.write(kt_code)
           '
 
       - name: Get Dependencies
