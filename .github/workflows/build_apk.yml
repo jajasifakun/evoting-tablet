@@ -27,16 +27,26 @@ jobs:
       - name: Recreate Clean Android Harness
         run: |
           cp pubspec.yaml pubspec.yaml.bak
+          # Backup custom icon files
+          mkdir -p /tmp/icon_backup
+          cp -r android/app/src/main/res/mipmap* /tmp/icon_backup/ 2>/dev/null || true
+          cp -r android/app/src/main/res/drawable* /tmp/icon_backup/ 2>/dev/null || true
+
           rm -rf android
           flutter create --project-name=evoting_karangmukti --platforms=android --org com.evoting .
           cp pubspec.yaml.bak pubspec.yaml
-          python3 -c '
-          import os
 
-          # 1. Update AndroidManifest.xml dengan Izin Kamera dan Bluetooth
+          # Restore custom icons
+          cp -r /tmp/icon_backup/* android/app/src/main/res/ 2>/dev/null || true
+
+          python3 -c '
+          import os, shutil, re
+
+          # 1. Update AndroidManifest.xml dengan Izin Kamera, Bluetooth, dan Nama Aplikasi
           path = "android/app/src/main/AndroidManifest.xml"
           with open(path, "r") as f:
               content = f.read()
+
           perms = """    <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
@@ -47,10 +57,30 @@ jobs:
 """
           if "android.permission.CAMERA" not in content:
               content = content.replace("<application", perms + "    <application")
+
+          content = re.sub(r"android:label=\"[^\"]*\"", "android:label=\"E-Voting Karang Mukti\"", content)
+          if "android:roundIcon" not in content:
+              content = content.replace("android:icon=\"@mipmap/ic_launcher\"", "android:icon=\"@mipmap/ic_launcher\" android:roundIcon=\"@mipmap/ic_launcher\"")
+
           with open(path, "w") as f:
               f.write(content)
 
-          # 2. Update MainActivity.kt dengan Native Bluetooth ESC/POS Channel
+          # 2. Update Launcher Icon Desktop Android dengan Logo Resmi Pilkades
+          logo_src = "assets/images/pilkades-logo.png"
+          for root, dirs, files in os.walk("android/app/src/main/res"):
+              for fn in files:
+                  if "ic_launcher" in fn and fn.endswith(".png"):
+                      shutil.copy(logo_src, os.path.join(root, fn))
+
+          val_dir = "android/app/src/main/res/values"
+          os.makedirs(val_dir, exist_ok=True)
+          with open(os.path.join(val_dir, "colors.xml"), "w") as f:
+              f.write("""<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>""")
+
+          # 3. Update MainActivity.kt dengan Native Bluetooth ESC/POS Channel
           kt_code = """package com.evoting.evoting_karangmukti
 
 import io.flutter.embedding.android.FlutterActivity
