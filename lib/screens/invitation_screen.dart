@@ -34,27 +34,32 @@ class _InvitationScreenState extends State<InvitationScreen> {
     });
   }
 
-  Future<void> _downloadCurrentCard() async {
+  Future<void> _downloadCurrentPdf() async {
     if (_voterCards.isEmpty) return;
     setState(() => _isDownloading = true);
 
     try {
       final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) throw Exception("Card boundary null");
+      if (boundary == null) throw Exception("Komponen kartu belum siap");
 
-      final image = await boundary.toImage(pixelRatio: 3.0);
+      final image = await boundary.toImage(pixelRatio: 2.5);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      final bytes = byteData!.buffer.asUint8List();
+      if (byteData == null) throw Exception("Gagal menghasilkan gambar kartu");
+      final bytes = byteData.buffer.asUint8List();
 
       final current = _voterCards[_selectedIndex];
       final voterName = current['voter_name'] ?? 'Pemilih';
       final cleanName = voterName.toString().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-      final fileName = 'Surat_Undangan_C6_${_selectedIndex + 1}_$cleanName.png';
+      final fileName = 'Surat_Undangan_C6_${_selectedIndex + 1}_$cleanName.pdf';
 
-      final ok = await ThermalPrinterService.instance.saveToDownloads(fileName, bytes);
+      final res = await ThermalPrinterService.instance.createSinglePdf(fileName, bytes);
 
       if (!mounted) return;
       setState(() => _isDownloading = false);
+
+      final bool isSuccess = res['success'] == true;
+      final String filePath = res['filePath']?.toString() ?? '';
+      final String displayPath = res['displayPath']?.toString() ?? 'Folder Download / Dokumen';
 
       showDialog(
         context: context,
@@ -62,29 +67,51 @@ class _InvitationScreenState extends State<InvitationScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
-              Icon(ok ? Icons.check_circle : Icons.error, color: ok ? Colors.green : Colors.red, size: 28),
+              Icon(isSuccess ? Icons.check_circle : Icons.error, color: isSuccess ? Colors.green : Colors.red, size: 28),
               const SizedBox(width: 8),
-              Text(ok ? 'Berhasil Diunduh!' : 'Gagal Mengunduh', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(isSuccess ? 'Berhasil Diunduh (PDF)!' : 'Gagal Mengunduh', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Surat Undangan C-6 untuk pemilih $voterName berhasil disimpan ke memori tablet.', style: const TextStyle(fontSize: 13.5)),
+              Text(
+                isSuccess
+                    ? 'Surat Undangan C-6 untuk pemilih $voterName berhasil disimpan dalam format dokumen PDF resmi siap cetak.'
+                    : 'Terjadi kendala saat menyimpan dokumen PDF: ${res['error'] ?? 'Gagal membuat file'}',
+                style: const TextStyle(fontSize: 13.5),
+              ),
               const SizedBox(height: 10),
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
-                child: Text('📁 Lokasi: Folder Download\n📄 File: $fileName', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                child: Text('📁 Lokasi: $displayPath\n📄 Berkas: $fileName', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
               ),
             ],
           ),
           actions: [
+            if (isSuccess && filePath.isNotEmpty) ...[
+              OutlinedButton.icon(
+                icon: const Icon(Icons.picture_as_pdf, size: 18),
+                label: const Text('Buka PDF'),
+                onPressed: () {
+                  ThermalPrinterService.instance.openPdf(filePath);
+                },
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.share, size: 18),
+                label: const Text('Bagikan'),
+                onPressed: () {
+                  ThermalPrinterService.instance.sharePdf(filePath);
+                },
+              ),
+            ],
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
+              child: const Text('Tutup'),
             ),
           ],
         ),
@@ -98,60 +125,104 @@ class _InvitationScreenState extends State<InvitationScreen> {
     }
   }
 
-  Future<void> _downloadAllCards() async {
+  Future<void> _downloadAllPdf() async {
     if (_voterCards.isEmpty) return;
     setState(() => _isDownloading = true);
 
-    int saved = 0;
-    for (int i = 0; i < _voterCards.length; i++) {
-      setState(() => _selectedIndex = i);
-      await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 150));
+    try {
+      const fileName = 'Surat_Undangan_C6_Semua_10_Pemilih.pdf';
+      final started = await ThermalPrinterService.instance.startMultiPagePdf(fileName);
+      if (!started) throw Exception("Gagal menginisialisasi dokumen PDF multi-halaman");
 
-      final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary != null) {
-        final image = await boundary.toImage(pixelRatio: 3.0);
-        final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-        if (byteData != null) {
-          final bytes = byteData.buffer.asUint8List();
-          final current = _voterCards[i];
-          final voterName = current['voter_name'] ?? 'Pemilih';
-          final cleanName = voterName.toString().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-          final fileName = 'Surat_Undangan_C6_${i + 1}_$cleanName.png';
+      int pageCount = 0;
+      for (int i = 0; i < _voterCards.length; i++) {
+        setState(() => _selectedIndex = i);
+        await WidgetsBinding.instance.endOfFrame;
+        await Future.delayed(const Duration(milliseconds: 120));
 
-          final ok = await ThermalPrinterService.instance.saveToDownloads(fileName, bytes);
-          if (ok) saved++;
+        final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+        if (boundary != null) {
+          final image = await boundary.toImage(pixelRatio: 2.2);
+          final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+          if (byteData != null) {
+            final bytes = byteData.buffer.asUint8List();
+            final ok = await ThermalPrinterService.instance.addPageToPdf(bytes);
+            if (ok) pageCount++;
+          }
         }
       }
-    }
 
-    if (!mounted) return;
-    setState(() => _isDownloading = false);
+      final res = await ThermalPrinterService.instance.finishMultiPagePdf();
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 28),
-            SizedBox(width: 8),
-            Text('Unduh Massal Selesai!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      if (!mounted) return;
+      setState(() => _isDownloading = false);
+
+      final bool isSuccess = res['success'] == true;
+      final String filePath = res['filePath']?.toString() ?? '';
+      final String displayPath = res['displayPath']?.toString() ?? 'Folder Download / Dokumen';
+
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(isSuccess ? Icons.check_circle : Icons.error, color: isSuccess ? Colors.green : Colors.red, size: 28),
+              const SizedBox(width: 8),
+              Text(isSuccess ? 'Unduh 10 Surat Selesai (PDF)!' : 'Gagal Mengunduh', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isSuccess
+                    ? 'Sebanyak $pageCount halaman Surat Undangan (Model C-6 KWK) telah digabungkan menjadi 1 file PDF resmi siap cetak.'
+                    : 'Terjadi kendala saat menyimpan dokumen PDF: ${res['error'] ?? 'Gagal membuat file'}',
+                style: const TextStyle(fontSize: 13.5),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
+                child: Text('📁 Lokasi: $displayPath\n📄 Berkas: $fileName ($pageCount Halaman)', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+              ),
+            ],
+          ),
+          actions: [
+            if (isSuccess && filePath.isNotEmpty) ...[
+              OutlinedButton.icon(
+                icon: const Icon(Icons.picture_as_pdf, size: 18),
+                label: const Text('Buka Dokumen PDF'),
+                onPressed: () {
+                  ThermalPrinterService.instance.openPdf(filePath);
+                },
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.share, size: 18),
+                label: const Text('Bagikan'),
+                onPressed: () {
+                  ThermalPrinterService.instance.sharePdf(filePath);
+                },
+              ),
+            ],
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Tutup'),
+            ),
           ],
         ),
-        content: Text(
-          'Sebanyak $saved dari ${_voterCards.length} berkas Surat Undangan (C-6 KWK) dengan Barcode & Panduan Posisi Jempol berhasil disimpan ke folder Download tablet!',
-          style: const TextStyle(fontSize: 13.5),
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Tutup'),
-          ),
-        ],
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isDownloading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan saat mengunduh berkas: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override
@@ -169,25 +240,25 @@ class _InvitationScreenState extends State<InvitationScreen> {
           IconButton(
             icon: _isDownloading
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : const Icon(Icons.download),
-            tooltip: 'Download Surat Undangan Ini (PNG)',
-            onPressed: _isDownloading ? null : _downloadCurrentCard,
+                : const Icon(Icons.picture_as_pdf),
+            tooltip: 'Download Surat Undangan Ini (PDF)',
+            onPressed: _isDownloading ? null : _downloadCurrentPdf,
           ),
           PopupMenuButton<String>(
-            tooltip: 'Pilihan Unduh',
+            tooltip: 'Pilihan Unduh Dokumen PDF',
             icon: const Icon(Icons.more_vert),
             onSelected: (val) {
-              if (val == 'single') _downloadCurrentCard();
-              if (val == 'all') _downloadAllCards();
+              if (val == 'single') _downloadCurrentPdf();
+              if (val == 'all') _downloadAllPdf();
             },
             itemBuilder: (ctx) => [
               const PopupMenuItem(
                 value: 'single',
                 child: Row(
                   children: [
-                    Icon(Icons.download, color: Colors.indigo, size: 20),
+                    Icon(Icons.picture_as_pdf, color: Colors.indigo, size: 20),
                     SizedBox(width: 8),
-                    Text('Download Surat Ini (PNG)'),
+                    Text('Download Surat Ini (PDF)'),
                   ],
                 ),
               ),
@@ -195,9 +266,9 @@ class _InvitationScreenState extends State<InvitationScreen> {
                 value: 'all',
                 child: Row(
                   children: [
-                    Icon(Icons.download_for_offline, color: Colors.green, size: 20),
+                    Icon(Icons.file_copy, color: Colors.green, size: 20),
                     SizedBox(width: 8),
-                    Text('Download Semua (10 Surat)'),
+                    Text('Download Semua 10 Surat (PDF)'),
                   ],
                 ),
               ),
@@ -289,9 +360,9 @@ class _InvitationScreenState extends State<InvitationScreen> {
                                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
-                                      icon: const Icon(Icons.download, size: 18),
-                                      label: const Text('Download Surat Ini (PNG)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                      onPressed: _isDownloading ? null : _downloadCurrentCard,
+                                      icon: const Icon(Icons.picture_as_pdf, size: 18),
+                                      label: const Text('Download Surat Ini (PDF)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                      onPressed: _isDownloading ? null : _downloadCurrentPdf,
                                     ),
                                     const SizedBox(width: 12),
                                     OutlinedButton.icon(
@@ -300,9 +371,9 @@ class _InvitationScreenState extends State<InvitationScreen> {
                                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
-                                      icon: const Icon(Icons.download_for_offline, size: 18),
-                                      label: const Text('Download Semua (10 Surat)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                      onPressed: _isDownloading ? null : _downloadAllCards,
+                                      icon: const Icon(Icons.file_copy, size: 18),
+                                      label: const Text('Download Semua 10 Surat (PDF)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                      onPressed: _isDownloading ? null : _downloadAllPdf,
                                     ),
                                   ],
                                 ),

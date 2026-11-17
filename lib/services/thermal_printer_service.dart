@@ -60,6 +60,75 @@ class ThermalPrinterService {
     }
   }
 
+  /// Buat file PDF dari gambar kartu undangan dan simpan ke memori perangkat
+  Future<Map<String, dynamic>> createSinglePdf(String fileName, Uint8List bytes) async {
+    try {
+      final res = await _channel.invokeMethod('createSinglePdf', {
+        'fileName': fileName,
+        'bytes': bytes,
+      });
+      if (res is Map) {
+        return Map<String, dynamic>.from(res);
+      }
+      return {'success': false, 'error': 'Format respons tidak dikenali'};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Mulai dokumen PDF multi-halaman untuk batch cetak/unduh
+  Future<bool> startMultiPagePdf(String fileName) async {
+    try {
+      final bool? ok = await _channel.invokeMethod('startMultiPagePdf', {'fileName': fileName});
+      return ok == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Tambahkan satu halaman ke dokumen PDF aktif
+  Future<bool> addPageToPdf(Uint8List bytes) async {
+    try {
+      final bool? ok = await _channel.invokeMethod('addPageToPdf', {'bytes': bytes});
+      return ok == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Selesaikan dan simpan dokumen PDF multi-halaman
+  Future<Map<String, dynamic>> finishMultiPagePdf() async {
+    try {
+      final res = await _channel.invokeMethod('finishMultiPagePdf');
+      if (res is Map) {
+        return Map<String, dynamic>.from(res);
+      }
+      return {'success': false, 'error': 'Format respons tidak dikenali'};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Buka dokumen PDF di aplikasi pembaca PDF bawaan Android
+  Future<bool> openPdf(String filePath) async {
+    try {
+      final bool? ok = await _channel.invokeMethod('openPdf', {'filePath': filePath});
+      return ok == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Bagikan dokumen PDF ke WhatsApp / Cetak / Simpan ke File
+  Future<bool> sharePdf(String filePath) async {
+    try {
+      final bool? ok = await _channel.invokeMethod('sharePdf', {'filePath': filePath});
+      return ok == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Simpan file biner (gambar kartu undangan / struk) ke folder Download perangkat Android
   Future<bool> saveToDownloads(String fileName, Uint8List bytes) async {
     try {

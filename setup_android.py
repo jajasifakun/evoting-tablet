@@ -18,17 +18,49 @@ def main():
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 """
         if "android.permission.CAMERA" not in content:
             content = content.replace("<application", perms + "    <application")
+
+        if 'android:requestLegacyExternalStorage="true"' not in content:
+            content = content.replace("<application", '<application android:requestLegacyExternalStorage="true"')
 
         content = re.sub(r'android:label="[^"]*"', 'android:label="E-Voting Karang Mukti"', content)
         if "android:roundIcon" not in content:
             content = content.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher"')
 
+        # FileProvider for opening and sharing PDF files
+        file_provider_xml = """        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>"""
+        if "androidx.core.content.FileProvider" not in content:
+            content = content.replace("</application>", file_provider_xml)
+
         with open(manifest_path, "w", encoding="utf-8") as f:
             f.write(content)
         print("AndroidManifest.xml updated successfully.")
+
+    # 1b. Create res/xml/file_paths.xml for FileProvider
+    xml_dir = "android/app/src/main/res/xml"
+    os.makedirs(xml_dir, exist_ok=True)
+    with open(os.path.join(xml_dir, "file_paths.xml"), "w", encoding="utf-8") as f:
+        f.write("""<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <external-files-path name="external_files" path="." />
+    <external-path name="external_storage" path="." />
+    <cache-path name="cache" path="." />
+    <files-path name="internal_files" path="." />
+</paths>""")
+    print("file_paths.xml created successfully.")
 
     # 2. Update Launcher Icons dengan Logo Resmi Pilkades
     logo_src = "assets/images/pilkades-logo.png"
@@ -74,7 +106,7 @@ def main():
 </resources>""")
         print("Launcher icons set successfully.")
 
-    # 3. Update MainActivity.kt dengan Native Bluetooth ESC/POS Thermal Printer Channel
+    # 3. Update MainActivity.kt dengan Native Bluetooth ESC/POS + Native PDF Generator Channel
     kt_code = """package com.evoting.evoting_karangmukti
 
 import io.flutter.embedding.android.FlutterActivity
@@ -83,6 +115,22 @@ import io.flutter.plugin.common.MethodChannel
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
+import android.content.ContentValues
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.pdf.PdfDocument
+import android.media.MediaScannerConnection
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import androidx.core.content.FileProvider
+import java.io.File
+import java.io.FileOutputStream
 import java.io.OutputStream
 import java.util.UUID
 
@@ -90,6 +138,11 @@ class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.evoting/thermal_printer"
     private var bluetoothSocket: BluetoothSocket? = null
     private var outputStream: OutputStream? = null
+
+    // Multi-page PDF generator state
+    private var activePdfDocument: PdfDocument? = null
+    private var activePdfFileName: String = ""
+    private var activePdfPageCount: Int = 0
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -162,35 +215,101 @@ class MainActivity: FlutterActivity() {
                 "isConnected" -> {
                     result.success(bluetoothSocket?.isConnected ?: false)
                 }
+                "createSinglePdf" -> {
+                    val fileName = call.argument<String>("fileName") ?: "Surat_Undangan_C6.pdf"
+                    val bytes = call.argument<ByteArray>("bytes")
+                    if (bytes != null) {
+                        try {
+                            val pdf = PdfDocument()
+                            drawBitmapToA4(pdf, 1, bytes)
+                            val res = savePdfDocument(pdf, fileName)
+                            result.success(res)
+                            return@setMethodCallHandler
+                        } catch (e: Exception) {
+                            result.success(mapOf("success" to false, "error" to (e.message ?: "Gagal membuat dokumen PDF")))
+                            return@setMethodCallHandler
+                        }
+                    }
+                    result.success(mapOf("success" to false, "error" to "Data gambar kosong"))
+                }
+                "startMultiPagePdf" -> {
+                    val fileName = call.argument<String>("fileName") ?: "Surat_Undangan_C6_Semua_Pemilih.pdf"
+                    try {
+                        activePdfDocument?.close()
+                        activePdfDocument = PdfDocument()
+                        activePdfFileName = fileName
+                        activePdfPageCount = 0
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "addPageToPdf" -> {
+                    val bytes = call.argument<ByteArray>("bytes")
+                    val doc = activePdfDocument
+                    if (doc != null && bytes != null) {
+                        try {
+                            activePdfPageCount++
+                            drawBitmapToA4(doc, activePdfPageCount, bytes)
+                            result.success(true)
+                            return@setMethodCallHandler
+                        } catch (e: Exception) {
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
+                    }
+                    result.success(false)
+                }
+                "finishMultiPagePdf" -> {
+                    val doc = activePdfDocument
+                    val fileName = activePdfFileName
+                    if (doc != null && activePdfPageCount > 0) {
+                        try {
+                            val res = savePdfDocument(doc, fileName)
+                            activePdfDocument = null
+                            activePdfPageCount = 0
+                            result.success(res)
+                            return@setMethodCallHandler
+                        } catch (e: Exception) {
+                            activePdfDocument?.close()
+                            activePdfDocument = null
+                            activePdfPageCount = 0
+                            result.success(mapOf("success" to false, "error" to (e.message ?: "Gagal menyimpan dokumen PDF")))
+                            return@setMethodCallHandler
+                        }
+                    }
+                    activePdfDocument?.close()
+                    activePdfDocument = null
+                    result.success(mapOf("success" to false, "error" to "Tidak ada halaman yang ditambahkan"))
+                }
+                "openPdf" -> {
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath != null) {
+                        val ok = openPdfFile(filePath)
+                        result.success(ok)
+                    } else {
+                        result.success(false)
+                    }
+                }
+                "sharePdf" -> {
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath != null) {
+                        val ok = sharePdfFile(filePath)
+                        result.success(ok)
+                    } else {
+                        result.success(false)
+                    }
+                }
                 "saveToDownloads" -> {
                     val fileName = call.argument<String>("fileName") ?: "Surat_Undangan.png"
                     val bytes = call.argument<ByteArray>("bytes")
                     if (bytes != null) {
                         try {
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                                val values = android.content.ContentValues().apply {
-                                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png")
-                                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
-                                }
-                                val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                                if (uri != null) {
-                                    contentResolver.openOutputStream(uri)?.use { os ->
-                                        os.write(bytes)
-                                        os.flush()
-                                    }
-                                    result.success(true)
-                                    return@setMethodCallHandler
-                                }
-                            } else {
-                                val file = java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), fileName)
-                                file.outputStream().use { os ->
-                                    os.write(bytes)
-                                    os.flush()
-                                }
-                                result.success(true)
-                                return@setMethodCallHandler
-                            }
+                            val docsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
+                            val f = File(docsDir, fileName)
+                            FileOutputStream(f).use { it.write(bytes) }
+                            result.success(true)
+                            return@setMethodCallHandler
                         } catch (e: Exception) {
                             result.success(false)
                             return@setMethodCallHandler
@@ -200,6 +319,121 @@ class MainActivity: FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    private fun drawBitmapToA4(doc: PdfDocument, pageNumber: Int, imageBytes: ByteArray) {
+        val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size) ?: return
+        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, pageNumber).create()
+        val page = doc.startPage(pageInfo)
+        val canvas = page.canvas
+
+        val pageWidth = 595f
+        val pageHeight = 842f
+        val margin = 20f
+
+        val maxW = pageWidth - (margin * 2)
+        val maxH = pageHeight - (margin * 2)
+
+        val scale = Math.min(maxW / bitmap.width.toFloat(), maxH / bitmap.height.toFloat())
+        val destW = bitmap.width.toFloat() * scale
+        val destH = bitmap.height.toFloat() * scale
+
+        val left = (pageWidth - destW) / 2f
+        val top = (pageHeight - destH) / 2f
+
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        val srcRect = Rect(0, 0, bitmap.width, bitmap.height)
+        val destRect = RectF(left, top, left + destW, top + destH)
+
+        canvas.drawBitmap(bitmap, srcRect, destRect, paint)
+        doc.finishPage(page)
+        bitmap.recycle()
+    }
+
+    private fun savePdfDocument(doc: PdfDocument, fileName: String): Map<String, Any> {
+        val safeFileName = if (fileName.endsWith(".pdf", ignoreCase = true)) fileName else "$fileName.pdf"
+        val docsDir = getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: filesDir
+        if (!docsDir.exists()) docsDir.mkdirs()
+        val file = File(docsDir, safeFileName)
+
+        FileOutputStream(file).use { os ->
+            doc.writeTo(os)
+        }
+        doc.close()
+
+        var publicDisplayPath = file.absolutePath
+
+        // Coba simpan ke folder publik Downloads jika diizinkan OS
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, safeFileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/")
+                }
+                val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    contentResolver.openOutputStream(uri)?.use { os ->
+                        file.inputStream().use { it.copyTo(os) }
+                    }
+                    publicDisplayPath = "Folder Download/$safeFileName"
+                }
+            } else {
+                val pubDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (pubDir.exists() || pubDir.mkdirs()) {
+                    val pubFile = File(pubDir, safeFileName)
+                    file.copyTo(pubFile, overwrite = true)
+                    MediaScannerConnection.scanFile(this, arrayOf(pubFile.absolutePath), arrayOf("application/pdf"), null)
+                    publicDisplayPath = pubFile.absolutePath
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return mapOf(
+            "success" to true,
+            "filePath" to file.absolutePath,
+            "fileName" to safeFileName,
+            "displayPath" to publicDisplayPath
+        )
+    }
+
+    private fun openPdfFile(filePath: String): Boolean {
+        return try {
+            val file = File(filePath)
+            if (!file.exists()) return false
+            val uri = FileProvider.getUriForFile(this, "${applicationContext.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(Intent.createChooser(intent, "Buka Dokumen PDF Surat Undangan"))
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun sharePdfFile(filePath: String): Boolean {
+        return try {
+            val file = File(filePath)
+            if (!file.exists()) return false
+            val uri = FileProvider.getUriForFile(this, "${applicationContext.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(Intent.createChooser(intent, "Bagikan / Cetak PDF Surat Undangan"))
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 }

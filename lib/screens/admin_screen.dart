@@ -591,9 +591,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 2,
                     ),
-                    icon: const Icon(Icons.download),
+                    icon: const Icon(Icons.picture_as_pdf),
                     label: const Text(
-                      'DOWNLOAD SURAT UNDANGAN',
+                      'DOWNLOAD SURAT UNDANGAN (PDF)',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                     onPressed: () {
