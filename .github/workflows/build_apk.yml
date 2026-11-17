@@ -27,17 +27,9 @@ jobs:
       - name: Recreate Clean Android Harness
         run: |
           cp pubspec.yaml pubspec.yaml.bak
-          # Backup custom icon files
-          mkdir -p /tmp/icon_backup
-          cp -r android/app/src/main/res/mipmap* /tmp/icon_backup/ 2>/dev/null || true
-          cp -r android/app/src/main/res/drawable* /tmp/icon_backup/ 2>/dev/null || true
-
           rm -rf android
           flutter create --project-name=evoting_karangmukti --platforms=android --org com.evoting .
           cp pubspec.yaml.bak pubspec.yaml
-
-          # Restore custom icons
-          cp -r /tmp/icon_backup/* android/app/src/main/res/ 2>/dev/null || true
 
           python3 -c '
           import os, shutil, re
@@ -67,10 +59,35 @@ jobs:
 
           # 2. Update Launcher Icon Desktop Android dengan Logo Resmi Pilkades
           logo_src = "assets/images/pilkades-logo.png"
-          for root, dirs, files in os.walk("android/app/src/main/res"):
-              for fn in files:
-                  if "ic_launcher" in fn and fn.endswith(".png"):
-                      shutil.copy(logo_src, os.path.join(root, fn))
+          try:
+              from PIL import Image
+              img = Image.open(logo_src).convert("RGBA")
+              sizes = {
+                  "mipmap-mdpi": (48, 48),
+                  "mipmap-hdpi": (72, 72),
+                  "mipmap-xhdpi": (96, 96),
+                  "mipmap-xxhdpi": (144, 144),
+                  "mipmap-xxxhdpi": (192, 192),
+              }
+              for folder, sz in sizes.items():
+                  d = os.path.join("android/app/src/main/res", folder)
+                  os.makedirs(d, exist_ok=True)
+                  resized = img.resize(sz, Image.LANCZOS if hasattr(Image, "LANCZOS") else Image.Resampling.LANCZOS)
+                  resized.save(os.path.join(d, "ic_launcher.png"), "PNG")
+
+              # Adaptive foreground
+              fg_dir = "android/app/src/main/res/drawable"
+              os.makedirs(fg_dir, exist_ok=True)
+              fg = Image.new("RGBA", (512, 512), (255, 255, 255, 0))
+              fit = img.resize((360, 360), Image.LANCZOS if hasattr(Image, "LANCZOS") else Image.Resampling.LANCZOS)
+              fg.paste(fit, (76, 76), fit)
+              fg.save(os.path.join(fg_dir, "ic_launcher_foreground.png"), "PNG")
+          except Exception as e:
+              print("PIL fallback:", e)
+              for root, dirs, files in os.walk("android/app/src/main/res"):
+                  for fn in files:
+                      if "ic_launcher" in fn and fn.endswith(".png"):
+                          shutil.copy(logo_src, os.path.join(root, fn))
 
           val_dir = "android/app/src/main/res/values"
           os.makedirs(val_dir, exist_ok=True)
