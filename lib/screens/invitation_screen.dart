@@ -456,29 +456,11 @@ class _InvitationScreenState extends State<InvitationScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Baris Konten: Data Pemilih & Barcode QR
+          // Baris Konten: QR Code di KIRI ATAS & Data Pemilih di KANAN
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Kolom Kiri: Identitas DPT
-              Expanded(
-                flex: 6,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoRow('Nama Pemilih', voterName, isBold: true),
-                    _buildInfoRow('NIK', nik, isMonospace: true),
-                    _buildInfoRow('Jenis Kelamin', 'Laki-laki / Perempuan'),
-                    _buildInfoRow('RT / RW', 'RT 001 / RW 001'),
-                    _buildInfoRow('Lokasi TPS', 'TPS 01 Desa Karang Mukti', isPrimary: true),
-                    _buildInfoRow('Status Kupon', 'Kupon Suara Sah 1 Kali'),
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              // Kolom Kanan: Barcode QR & Box Panduan Jempol
+              // Kolom Kiri: Barcode QR & Box Panduan Jempol (SEBELAH KIRI ATAS)
               Expanded(
                 flex: 4,
                 child: Column(
@@ -496,7 +478,7 @@ class _InvitationScreenState extends State<InvitationScreen> {
                           QrImageView(
                             data: tokenCode,
                             version: QrVersions.auto,
-                            size: 110.0,
+                            size: 115.0,
                             backgroundColor: Colors.white,
                           ),
                           const SizedBox(height: 4),
@@ -540,13 +522,31 @@ class _InvitationScreenState extends State<InvitationScreen> {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            'Pegang kertas hanya pada kotak ini agar QR Code tidak tertutup jari saat di-scan kamera.',
+                            'Pegang kertas di sisi kanan agar QR Code di kiri atas bebas di-scan kamera.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 9, color: Color(0xFF1E1B4B), height: 1.2),
+                            style: TextStyle(fontSize: 8.5, color: Color(0xFF1E1B4B), height: 1.2),
                           ),
                         ],
                       ),
                     ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 14),
+
+              // Kolom Kanan: Identitas DPT Pemilih
+              Expanded(
+                flex: 6,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow('Nama Pemilih', voterName, isBold: true),
+                    _buildInfoRow('NIK', nik, isMonospace: true),
+                    _buildInfoRow('Jenis Kelamin', 'Laki-laki / Perempuan'),
+                    _buildInfoRow('RT / RW', 'RT 001 / RW 001'),
+                    _buildInfoRow('Lokasi TPS', 'TPS 01 Desa Karang Mukti', isPrimary: true),
+                    _buildInfoRow('Status Kupon', 'Kupon Suara Sah 1 Kali'),
                   ],
                 ),
               ),
