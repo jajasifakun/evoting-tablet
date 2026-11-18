@@ -340,23 +340,6 @@ class _BallotScreenState extends State<BallotScreen> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                 ),
-                const SizedBox(height: 12),
-
-                // Visi Ringkas
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    candidate.vision,
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.4),
-                  ),
-                ),
                 const SizedBox(height: 20),
 
                 // Tombol Coblos

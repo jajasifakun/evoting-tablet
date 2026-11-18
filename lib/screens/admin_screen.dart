@@ -86,7 +86,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   Future<void> _handleResetTotalSimulation() async {
     final confirm = await _showConfirmDialog(
       title: '⚠️ RESET TOTAL SELURUH SIMULASI',
-      message: 'PERINGATAN: Seluruh suara hasil simulasi akan dihapus kembali ke 0 suara, dan seluruh 10 DPT serta QR Code diaktifkan kembali seperti TPS baru dibuka. Lanjutkan?',
+      message: 'PERINGATAN: Seluruh suara hasil simulasi akan dihapus kembali ke 0 suara, dan seluruh ${_votersList.isNotEmpty ? _votersList.length : 20} DPT serta QR Code diaktifkan kembali seperti TPS baru dibuka. Lanjutkan?',
       isDanger: true,
     );
     if (confirm == true) {
@@ -144,13 +144,13 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          tabs: const [
-            Tab(icon: Icon(Icons.bar_chart), text: 'Rekap Suara'),
-            Tab(icon: Icon(Icons.people), text: 'Daftar DPT (10)'),
-            Tab(icon: Icon(Icons.qr_code_2), text: 'Token QR'),
-            Tab(icon: Icon(Icons.mail_outline), text: 'Undangan & Barcode'),
-            Tab(icon: Icon(Icons.print), text: 'Printer Thermal'),
-            Tab(icon: Icon(Icons.settings_backup_restore), text: 'Reset Simulasi'),
+          tabs: [
+            const Tab(icon: Icon(Icons.bar_chart), text: 'Rekap Suara'),
+            Tab(icon: const Icon(Icons.people), text: 'Daftar DPT (${_votersList.isNotEmpty ? _votersList.length : 20})'),
+            const Tab(icon: Icon(Icons.qr_code_2), text: 'Token QR'),
+            const Tab(icon: Icon(Icons.mail_outline), text: 'Undangan & Barcode'),
+            const Tab(icon: Icon(Icons.print), text: 'Printer Thermal'),
+            const Tab(icon: Icon(Icons.settings_backup_restore), text: 'Reset Simulasi'),
           ],
         ),
       ),
@@ -456,9 +456,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Mengembalikan status 10 DPT menjadi "Belum Memilih" dan seluruh QR Code menjadi "Unused". Suara pemilih sebelumnya tetap tersimpan.',
-                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                Text(
+                  'Mengembalikan status ${_votersList.isNotEmpty ? _votersList.length : 20} DPT menjadi "Belum Memilih" dan seluruh QR Code menjadi "Unused". Suara pemilih sebelumnya tetap tersimpan.',
+                  style: const TextStyle(fontSize: 13, color: Colors.grey),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -580,9 +580,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                       elevation: 2,
                     ),
                     icon: const Icon(Icons.print),
-                    label: const Text(
-                      'BUKA & CETAK 10 UNDANGAN',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    label: Text(
+                      'BUKA & CETAK ${_votersList.isNotEmpty ? _votersList.length : 20} UNDANGAN',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                     onPressed: () {
                       Navigator.push(
@@ -623,9 +623,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
           const SizedBox(height: 24),
 
-          const Text(
-            'DAFTAR KARTU UNDANGAN PEMILIH (10 DPT):',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF0F172A)),
+          Text(
+            'DAFTAR KARTU UNDANGAN PEMILIH (${_votersList.isNotEmpty ? _votersList.length : 20} DPT):',
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 12),
 
