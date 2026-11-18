@@ -159,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: Text(
-                    'SISTEM E-VOTING RESMI PILKADES',
+                    'SISTEM E-VOTING RESMI PILKADES TATI',
                     style: TextStyle(
                       color: Colors.indigo.shade700,
                       fontWeight: FontWeight.w800,

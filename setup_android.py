@@ -31,7 +31,7 @@ def main():
         if 'android:requestLegacyExternalStorage="true"' not in content:
             content = content.replace("<application", '<application android:requestLegacyExternalStorage="true"')
 
-        content = re.sub(r'android:label="[^"]*"', 'android:label="E-Voting Karang Mukti"', content)
+        content = re.sub(r'android:label="[^"]*"', 'android:label="E-Voting Pilkades Tati"', content)
         if "android:roundIcon" not in content:
             content = content.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher"')
 
@@ -52,6 +52,15 @@ def main():
         with open(manifest_path, "w", encoding="utf-8") as f:
             f.write(content)
         print("AndroidManifest.xml updated successfully.")
+
+    gradle_path = "android/app/build.gradle"
+    if os.path.exists(gradle_path):
+        with open(gradle_path, "r", encoding="utf-8") as f:
+            g_content = f.read()
+        g_content = re.sub(r'applicationId\s+"[^"]*"', 'applicationId "com.evoting.pilkades_tati"', g_content)
+        with open(gradle_path, "w", encoding="utf-8") as f:
+            f.write(g_content)
+        print("build.gradle applicationId updated to com.evoting.pilkades_tati.")
 
     # 1b. Create res/xml/file_paths.xml for FileProvider
     xml_dir = "android/app/src/main/res/xml"

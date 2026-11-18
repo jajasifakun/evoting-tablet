@@ -14,7 +14,7 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('pilkades_karangmukti.db');
+    _database = await _initDB('pilkades_tati.db');
     return _database!;
   }
 
@@ -122,39 +122,49 @@ class DatabaseHelper {
       'kpps_chairman': 'Kasda, S.T.,M.T',
     });
 
-    // B. Candidates (Calon A & Calon B)
+    // B. Candidates (1: TARSIH, S.Pd & 2: Calon lain)
     await db.insert('candidates', {
       'id': 1,
       'order_number': 1,
-      'letter': 'A',
-      'name': 'CALON A',
+      'letter': '1',
+      'name': 'TARSIH, S.Pd',
       'photo_asset': 'assets/images/candidate-a.png',
-      'vision': 'Mewujudkan Desa Karang Mukti yang Maju, Transparan, Berdaya Saing, dan Sejahtera Berbasis Gotong Royong.',
-      'mission': '1. Peningkatan pelayanan publik yang cepat, mudah, dan transparan.\n2. Pemerataan pembangunan infrastruktur jalan usaha tani dan permukiman.\n3. Penguatan ekonomi desa melalui BUMDes dan UMKM masyarakat Karang Mukti.\n4. Peningkatan tata kelola pemerintahan desa yang bersih dan akuntabel.',
+      'vision': 'Mewujudkan Desa yang Maju, Transparan, Berdaya Saing, dan Sejahtera Berbasis Gotong Royong.',
+      'mission': '1. Peningkatan pelayanan publik yang cepat, ramah, dan transparan.\n2. Pemerataan pembangunan sarana prasarana desa dan jalan usaha tani.\n3. Penguatan ekonomi warga desa melalui BUMDes dan pembinaan UMKM.\n4. Mewujudkan tata kelola pemerintahan desa yang amanah dan akuntabel.',
     });
 
     await db.insert('candidates', {
       'id': 2,
       'order_number': 2,
-      'letter': 'B',
-      'name': 'CALON B',
+      'letter': '2',
+      'name': 'Calon lain',
       'photo_asset': 'assets/images/candidate-b.png',
-      'vision': 'Terwujudnya Karang Mukti Mandiri, Agamis, Berkeadilan, dan Berakhlak Mulia Menuju Masyarakat Makmur.',
-      'mission': '1. Meningkatkan kualitas sumber daya manusia desa melalui pendidikan dan pelatihan terpadu.\n2. Revitalisasi pertanian modern dan ketersediaan sarana prasarana produksi tani.\n3. Peningkatan program kesehatan lansia, ibu, dan balita di Posyandu.\n4. Pelestarian nilai-nilai kearifan lokal, kerukunan warga, dan keagamaan.',
+      'vision': 'Visi dan Misi Calon Alternatif.',
+      'mission': 'Pilihan Calon Alternatif Pilkades.',
     });
 
-    // C. 10 Sample DPT Voters & Linked QR Tokens
+    // C. 20 Sample DPT Voters & Linked QR Tokens
     final voters = [
-      {'nik': '3213051001900001', 'name': 'SULAEMAN', 'gender': 'L', 'rt': '01', 'rw': '01', 'address': 'Dusun Karang Anyar RT 01/01', 'token': 'KM2026-TEST-VOTE01'},
-      {'nik': '3213055202880002', 'name': 'SITI FATIMAH', 'gender': 'P', 'rt': '01', 'rw': '01', 'address': 'Dusun Karang Anyar RT 01/01', 'token': 'KM2026-TEST-VOTE02'},
-      {'nik': '3213051507750003', 'name': 'ASEP KURNIAWAN', 'gender': 'L', 'rt': '02', 'rw': '01', 'address': 'Dusun Karang Anyar RT 02/01', 'token': 'KM26-YT5P7U3MIGFZ'},
-      {'nik': '3213056108820004', 'name': 'NURHAYATI', 'gender': 'P', 'rt': '02', 'rw': '01', 'address': 'Dusun Karang Anyar RT 02/01', 'token': 'KM26-SYNAV2PJQZRP'},
-      {'nik': '3213052003920005', 'name': 'DEDEN KOMARUDIN', 'gender': 'L', 'rt': '03', 'rw': '01', 'address': 'Dusun Karang Mulya RT 03/01', 'token': 'KM26-GHEMWTKK1EOY'},
-      {'nik': '3213054511940006', 'name': 'ENDAH SUHARTINI', 'gender': 'P', 'rt': '03', 'rw': '01', 'address': 'Dusun Karang Mulya RT 03/01', 'token': 'KM26-V6QT6BOZNTKE'},
-      {'nik': '3213051204850007', 'name': 'TARYANA', 'gender': 'L', 'rt': '01', 'rw': '02', 'address': 'Dusun Karang Asih RT 01/02', 'token': 'KM26-1CJGBZ442EMG'},
-      {'nik': '3213054909890008', 'name': 'RATNA WULANDARI', 'gender': 'P', 'rt': '01', 'rw': '02', 'address': 'Dusun Karang Asih RT 01/02', 'token': 'KM26-ILDBBU4D0IOS'},
-      {'nik': '3213052306780009', 'name': 'MAMAN SUPARMAN', 'gender': 'L', 'rt': '02', 'rw': '02', 'address': 'Dusun Karang Asih RT 02/02', 'token': 'KM26-38SO66JCLAAJ'},
-      {'nik': '3213056712800010', 'name': 'YAYAH ROKAYAH', 'gender': 'P', 'rt': '02', 'rw': '02', 'address': 'Dusun Karang Asih RT 02/02', 'token': 'KM26-ZYDPUAIZVJWV'},
+      {'nik': '3213051403810001', 'name': 'DADANG SUHENDAR', 'gender': 'L', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE01'},
+      {'nik': '3213055808840002', 'name': 'NINA HERLINA', 'gender': 'P', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE02'},
+      {'nik': '3213052206790003', 'name': 'AGUS SETIAWAN', 'gender': 'L', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE03'},
+      {'nik': '3213056104860004', 'name': 'AI SITI ROHMAH', 'gender': 'P', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE04'},
+      {'nik': '3213051009830005', 'name': 'WAWAN KURNIA', 'gender': 'L', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE05'},
+      {'nik': '3213054711880006', 'name': 'ENI NURAENI', 'gender': 'P', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE06'},
+      {'nik': '3213050502760007', 'name': 'JAJANG HIDAYAT', 'gender': 'L', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE07'},
+      {'nik': '3213056305910008', 'name': 'RINA MARLINA', 'gender': 'P', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE08'},
+      {'nik': '3213051907800009', 'name': 'UDIN SAEPUDIN', 'gender': 'L', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE09'},
+      {'nik': '3213055212850010', 'name': 'TUTI ALAWIYAH', 'gender': 'P', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE10'},
+      {'nik': '3213052801820011', 'name': 'CECEP SUPRIATNA', 'gender': 'L', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE11'},
+      {'nik': '3213054903890012', 'name': 'LILIS SURYANI', 'gender': 'P', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE12'},
+      {'nik': '3213051608770013', 'name': 'IWAN RIDWAN', 'gender': 'L', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE13'},
+      {'nik': '3213056509930014', 'name': 'DEWI KARTIKA', 'gender': 'P', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE14'},
+      {'nik': '3213050804750015', 'name': 'YAYAT RUHIYAT', 'gender': 'L', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE15'},
+      {'nik': '3213055610870016', 'name': 'NENENG HASANAH', 'gender': 'P', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE16'},
+      {'nik': '3213052412830017', 'name': 'HERI HERMAWAN', 'gender': 'L', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE17'},
+      {'nik': '3213054106920018', 'name': 'SRI WAHYUNI', 'gender': 'P', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE18'},
+      {'nik': '3213051105800019', 'name': 'DENI RAMDANI', 'gender': 'L', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE19'},
+      {'nik': '3213056907860020', 'name': 'KOKOM KOMALASARI', 'gender': 'P', 'rt': '09', 'rw': '05', 'address': 'Ciomas RT 09 RW 05', 'token': 'KM26-TATI-VOTE20'},
     ];
 
     for (var i = 0; i < voters.length; i++) {
@@ -178,7 +188,7 @@ class DatabaseHelper {
 
     await db.insert('audit_logs', {
       'action': 'INITIALIZE_SYSTEM',
-      'description': 'Inisialisasi sistem E-Voting Pilkades Karang Mukti 2026 di Tablet Android',
+      'description': 'Inisialisasi sistem E-Voting Pilkades Tati di Tablet Android',
       'created_at': DateTime.now().toIso8601String(),
     });
   }

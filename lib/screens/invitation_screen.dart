@@ -130,7 +130,7 @@ class _InvitationScreenState extends State<InvitationScreen> {
     setState(() => _isDownloading = true);
 
     try {
-      const fileName = 'Surat_Undangan_C6_Semua_10_Pemilih.pdf';
+      final fileName = 'Surat_Undangan_C6_Semua_${_voterCards.length}_Pemilih.pdf';
       final started = await ThermalPrinterService.instance.startMultiPagePdf(fileName);
       if (!started) throw Exception("Gagal menginisialisasi dokumen PDF multi-halaman");
 
@@ -169,7 +169,7 @@ class _InvitationScreenState extends State<InvitationScreen> {
             children: [
               Icon(isSuccess ? Icons.check_circle : Icons.error, color: isSuccess ? Colors.green : Colors.red, size: 28),
               const SizedBox(width: 8),
-              Text(isSuccess ? 'Unduh 10 Surat Selesai (PDF)!' : 'Gagal Mengunduh', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(isSuccess ? 'Unduh $pageCount Surat Selesai (PDF)!' : 'Gagal Mengunduh', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
           content: Column(
@@ -372,7 +372,7 @@ class _InvitationScreenState extends State<InvitationScreen> {
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
                                       icon: const Icon(Icons.file_copy, size: 18),
-                                      label: const Text('Download Semua 10 Surat (PDF)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                      label: Text('Download Semua ${_voterCards.length} Surat (PDF)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                       onPressed: _isDownloading ? null : _downloadAllPdf,
                                     ),
                                   ],
