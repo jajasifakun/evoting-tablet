@@ -31,3 +31,6 @@ flutter:
     - assets/images/candidate-a.png
     - assets/images/candidate-b.png
     - assets/images/default-candidate.png
+    - assets/images/hand_guide.png
+    - assets/images/kab_logo.png
+    - assets/images/kpps_signature.png

@@ -382,7 +382,7 @@ class _InvitationScreenState extends State<InvitationScreen> {
                                 // Kartu Undangan yang Ditangkap untuk Download
                                 RepaintBoundary(
                                   key: _cardKey,
-                                  child: _buildInvitationCard(_voterCards[_selectedIndex]),
+                                  child: _buildInvitationCard(_voterCards[_selectedIndex], _selectedIndex),
                                 ),
                               ],
                             ),
@@ -395,158 +395,261 @@ class _InvitationScreenState extends State<InvitationScreen> {
     );
   }
 
-  Widget _buildInvitationCard(Map<String, dynamic> item) {
+  Widget _buildInvitationCard(Map<String, dynamic> item, int index) {
     final voterName = item['voter_name'] ?? 'SULAEMAN';
     final nik = item['voter_nik'] ?? '3213051001900001';
     final tokenCode = item['token_code'] ?? 'KM2026-TEST-VOTE01';
+    final dptNo = item['dpt_no'] ?? (index + 1);
+
+    final now = DateTime.now();
+    final printTime = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black87, width: 2),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.black26, width: 1),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 15, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 2)),
         ],
       ),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Kop Surat
+          // 1. HEADER: Logo Pemda di Kiri, Judul Resmi di Tengah, No Urut DPT di Kanan
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Image.asset('assets/images/pilkades-logo.png', width: 50, height: 50, errorBuilder: (_, __, ___) => const Icon(Icons.how_to_vote, size: 45, color: Colors.indigo)),
-              const SizedBox(width: 12),
-              Expanded(
+              Image.asset(
+                'assets/images/kab_logo.png',
+                width: 44,
+                height: 56,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(Icons.shield, size: 45, color: Colors.green),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
                 child: Column(
                   children: [
-                    const Text('PANITIA PEMILIHAN KEPALA DESA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
-                    Text('DESA KARANG MUKTI', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.indigo.shade800)),
-                    const Text('Kecamatan Cipeundeuy • Kabupaten Subang', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                    Container(
-                      margin: const EdgeInsets.only(top: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                      decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(4)),
-                      child: const Text('MODEL C-6 KWK PILKADES 2026', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    Text(
+                      'SURAT UNDANGAN',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black, letterSpacing: 0.3),
+                    ),
+                    Text(
+                      'PEMUNGUTAN SUARA',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black, letterSpacing: 0.3),
+                    ),
+                    Text(
+                      'KEPADA PEMILIH',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black, letterSpacing: 0.3),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 50),
+              SizedBox(
+                width: 75,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'No Urut DPT',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black87),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      '$dptNo',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
 
-          const SizedBox(height: 12),
-          const Divider(thickness: 1.5, color: Colors.black),
-          const SizedBox(height: 6),
-
-          const Center(
-            child: Text(
-              'SURAT PEMBERITAHUAN PEMUNGUTAN SUARA',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, decoration: TextDecoration.underline),
-            ),
-          ),
-          const Center(
-            child: Text(
-              'Bawalah lembar ini ke TPS 01 untuk dipindai pada kamera bilik suara',
-              style: TextStyle(fontSize: 10.5, color: Colors.grey),
-            ),
-          ),
           const SizedBox(height: 16),
 
-          // Baris Konten: QR Code di KIRI ATAS & Data Pemilih di KANAN
+          // 2. BARIS QR CODE (Kiri) & KOTAK INSTRUKSI (Kanan)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Kolom Kiri: Barcode QR & Box Panduan Jempol (SEBELAH KIRI ATAS)
-              Expanded(
-                flex: 4,
-                child: Column(
-                  children: [
-                    // Kotak QR Code
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade400, width: 1.5),
-                      ),
-                      child: Column(
-                        children: [
-                          QrImageView(
-                            data: tokenCode,
-                            version: QrVersions.auto,
-                            size: 115.0,
-                            backgroundColor: Colors.white,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            tokenCode,
-                            style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 10, color: Colors.indigo.shade700),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // KOTAK VISUAL KHUSUS: PANDUAN POSISI JEMPOL
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEEF2FF),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.indigo.shade700, width: 2, strokeAlign: BorderSide.strokeAlignInside),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.thumb_up_alt, size: 16, color: Colors.indigo),
-                              const SizedBox(width: 4),
-                              Text(
-                                'AREA JEMPOL',
-                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Colors.indigo.shade900),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.amber.shade300, borderRadius: BorderRadius.circular(4)),
-                            child: const Text('PEGANG DI SINI 👍', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 9.5, color: Colors.black87)),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Pegang kertas di sisi kanan agar QR Code di kiri atas bebas di-scan kamera.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 8.5, color: Color(0xFF1E1B4B), height: 1.2),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+              // QR Code di Kiri (Besar, jelas, mudah discan)
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.black12, width: 0.5),
+                ),
+                padding: const EdgeInsets.all(2),
+                child: QrImageView(
+                  data: tokenCode,
+                  version: QrVersions.auto,
+                  size: 110.0,
+                  padding: EdgeInsets.zero,
+                  backgroundColor: Colors.white,
                 ),
               ),
 
               const SizedBox(width: 14),
 
-              // Kolom Kanan: Identitas DPT Pemilih
+              // Kotak Berbingkai di Kanan
               Expanded(
-                flex: 6,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 4),
+                    // Kotak 1: Merah (SURAT UNDANGAN INI BERSIFAT RAHASIA)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFFD32F2F), width: 1.2),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'SURAT UNDANGAN INI BERSIFAT RAHASIA',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFFD32F2F),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10.5,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Kotak 2: Border Gelap (Tunjukan QRcode berikut saat akan memilih)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: Colors.black87, width: 1.0),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Tunjukan QRcode berikut saat akan memilih',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // 3. PARAGRAF UNDANGAN RESMI
+          Text.rich(
+            TextSpan(
+              text: 'Bersama ini diberitahukan bahwa Panitia Pemilihan mengundang Saudara/i\n',
+              style: const TextStyle(fontSize: 10.5, color: Colors.black87, height: 1.35),
+              children: [
+                TextSpan(
+                  text: '$voterName ',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+                const TextSpan(text: 'NIK '),
+                TextSpan(
+                  text: '$nik ',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+                const TextSpan(text: 'untuk memberikan suara\npada pemilihan: '),
+                const TextSpan(
+                  text: 'PEMILIHAN KEPALA DESA KARANG MUKTI ',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+                const TextSpan(text: 'yang akan\ndilaksanakan pada:'),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // 4. TABEL JADWAL & LOKASI PEMILIHAN
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Column(
+              children: [
+                _buildScheduleRow('Hari/Tanggal', 'Minggu, 22 November 2026'),
+                _buildScheduleRow('Pukul', '07:00 s/d 14:00 WIB'),
+                _buildScheduleRow('Nomor TPS', 'TPS 1'),
+                _buildScheduleRow('Alamat TPS', 'Jalan Merak Ngibing Nomor 12'),
+                _buildScheduleRow('Nomor Bilik Suara', 'Bilik Suara Nomor 1'),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // 5. CATATAN KETENTUAN
+          const Text.rich(
+            TextSpan(
+              text: 'Catatan : ',
+              style: TextStyle(fontSize: 9.5, color: Colors.black87, fontWeight: FontWeight.bold, height: 1.35),
+              children: [
+                TextSpan(
+                  text:
+                      'Surat Undangan ini beserta KTP Elektronik harus dibawa pada saat pencoblosan dan tidak boleh diwakilkan. Surat Undangan ini tidak boleh disebarluaskan, duplikasi atau diperlihatkan kepada pihak yang tidak berkepentingan.',
+                  style: TextStyle(fontWeight: FontWeight.normal),
+                ),
+              ],
+            ),
+            textAlign: TextAlign.justify,
+          ),
+
+          const SizedBox(height: 18),
+
+          // 6. TANDA TANGAN (Kiri: Penerima, Kanan: Panitia Pemilihan)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Kolom Kiri: Yang Menerima
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildInfoRow('Nama Pemilih', voterName, isBold: true),
-                    _buildInfoRow('NIK', nik, isMonospace: true),
-                    _buildInfoRow('Jenis Kelamin', 'Laki-laki / Perempuan'),
-                    _buildInfoRow('RT / RW', 'RT 001 / RW 001'),
-                    _buildInfoRow('Lokasi TPS', 'TPS 01 Desa Karang Mukti', isPrimary: true),
-                    _buildInfoRow('Status Kupon', 'Kupon Suara Sah 1 Kali'),
+                    const Text('..................., ............ 2026', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    const SizedBox(height: 2),
+                    const Text('Yang Menerima,', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    const SizedBox(height: 42),
+                    Text(
+                      voterName,
+                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Kolom Kanan: Panitia Pemilihan Ketua
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Subang, 10 November 2026', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    const SizedBox(height: 1),
+                    const Text('PANITIA PEMILIHAN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black)),
+                    const Text('Ketua,', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    const SizedBox(height: 2),
+                    Image.asset(
+                      'assets/images/kpps_signature.png',
+                      height: 42,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const SizedBox(height: 42),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text('Lulu Lukman', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black)),
                   ],
                 ),
               ),
@@ -555,45 +658,42 @@ class _InvitationScreenState extends State<InvitationScreen> {
 
           const SizedBox(height: 14),
 
-          // Petunjuk Bilik Suara
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Petunjuk Singkat di Bilik Suara:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                SizedBox(height: 4),
-                Text('1. Pegang lembaran pada AREA JEMPOL di bagian bawah.', style: TextStyle(fontSize: 10)),
-                Text('2. Arahkan QR Code ke kamera tablet hingga terdengar bunyi verifikasi.', style: TextStyle(fontSize: 10)),
-                Text('3. Pilih calon di layar sentuh tablet, konfirmasi, dan ambil struk fisik untuk dimasukkan ke KOTAK SUARA FISIK.', style: TextStyle(fontSize: 10)),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // Tanda Tangan
+          // 7. BAGIAN BAWAH: KOTAK PANDUAN POSISI TANGAN + FOTO TANGAN + TANGGAL CETAK
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Column(
-                children: [
-                  const Text('Pemilih', style: TextStyle(fontSize: 11)),
-                  const SizedBox(height: 35),
-                  Text('($voterName)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                ],
+              // Kotak Instruksi Letak Tangan
+              Container(
+                width: 130,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.black87, width: 0.9),
+                ),
+                child: const Text(
+                  'Letakan posisi tangan\nditengah-tengah ujung\nbawah persis seperti\npada gambar untuk\nmemudahkan proses\nscan QRcode',
+                  style: TextStyle(fontSize: 8.5, height: 1.25, color: Colors.black87),
+                ),
               ),
-              Column(
-                children: [
-                  const Text('Karang Mukti, 2026\nKetua KPPS 1', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
-                  const SizedBox(height: 25),
-                  const Text('( KASDA, S.T., M.T. )', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                ],
+
+              const SizedBox(width: 8),
+
+              // Foto Panduan Posisi Tangan Memegang Ujung Kertas
+              Image.asset(
+                'assets/images/hand_guide.png',
+                height: 65,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(Icons.thumb_up, size: 50, color: Colors.indigo),
+              ),
+
+              const Spacer(),
+
+              // Tanggal & Waktu Cetak
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  'Tgl cetak: $printTime',
+                  style: const TextStyle(fontSize: 9, color: Colors.black87),
+                ),
               ),
             ],
           ),
@@ -602,26 +702,24 @@ class _InvitationScreenState extends State<InvitationScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {bool isBold = false, bool isMonospace = false, bool isPrimary = false}) {
+  Widget _buildScheduleRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 3),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 90,
-            child: Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
+            width: 120,
+            child: Text(label, style: const TextStyle(fontSize: 10, color: Colors.black87)),
           ),
-          const Text(': ', style: TextStyle(fontSize: 11, color: Colors.grey)),
+          const SizedBox(
+            width: 12,
+            child: Text(':', style: TextStyle(fontSize: 10, color: Colors.black87)),
+          ),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-                fontFamily: isMonospace ? 'monospace' : null,
-                color: isPrimary ? Colors.indigo.shade800 : Colors.black87,
-              ),
+              style: const TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.w500),
             ),
           ),
         ],

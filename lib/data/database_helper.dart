@@ -348,7 +348,7 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getTokensWithVoters() async {
     final db = await instance.database;
     return await db.rawQuery('''
-      SELECT vt.token_code, vt.status, vt.used_at, v.name as voter_name, v.nik as voter_nik
+      SELECT vt.id as dpt_no, vt.token_code, vt.status, vt.used_at, v.name as voter_name, v.nik as voter_nik, v.rt, v.rw, v.address
       FROM voter_tokens vt
       LEFT JOIN voters v ON vt.voter_id = v.id
       ORDER BY vt.id ASC
