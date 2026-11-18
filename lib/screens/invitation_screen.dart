@@ -396,10 +396,24 @@ class _InvitationScreenState extends State<InvitationScreen> {
   }
 
   Widget _buildInvitationCard(Map<String, dynamic> item, int index) {
-    final voterName = item['voter_name'] ?? 'SULAEMAN';
-    final nik = item['voter_nik'] ?? '3213051001900001';
+    final voterName = (item['voter_name'] ?? item['name'] ?? 'SAMSUL BAHRIYANTO').toString().toUpperCase();
+    final nik = (item['voter_nik'] ?? item['nik'] ?? '9909052107890001').toString();
     final tokenCode = item['token_code'] ?? 'KM2026-TEST-VOTE01';
-    final dptNo = item['dpt_no'] ?? (index + 1);
+    final dptNo = item['dpt_no'] ?? item['id'] ?? (index + 1);
+
+    // Dynamic TPS, Alamat, Bilik Suara
+    final rawTps = item['tps_no'] ?? item['tps'] ?? '1';
+    final formattedTps = rawTps.toString().toUpperCase().contains('TPS') ? rawTps.toString() : 'TPS $rawTps';
+
+    final rawAddress = item['address'] ?? item['tps_address'];
+    final formattedAddress = (rawAddress != null && rawAddress.toString().trim().isNotEmpty)
+        ? rawAddress.toString().trim()
+        : 'Jalan Merak Ngibing Nomor 12';
+
+    final rawBilik = item['bilik_no'] ?? item['bilik'] ?? '1';
+    final formattedBilik = rawBilik.toString().toLowerCase().contains('bilik')
+        ? rawBilik.toString()
+        : 'Bilik Suara Nomor $rawBilik';
 
     final now = DateTime.now();
     final printTime = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
@@ -407,94 +421,122 @@ class _InvitationScreenState extends State<InvitationScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.black26, width: 1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.black, width: 2),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 2)),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. HEADER: Logo Pemda di Kiri, Judul Resmi di Tengah, No Urut DPT di Kanan
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Image.asset(
-                'assets/images/kab_logo.png',
-                width: 44,
-                height: 56,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(Icons.shield, size: 45, color: Colors.green),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      'SURAT UNDANGAN',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black, letterSpacing: 0.3),
-                    ),
-                    Text(
-                      'PEMUNGUTAN SUARA',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black, letterSpacing: 0.3),
-                    ),
-                    Text(
-                      'KEPADA PEMILIH',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black, letterSpacing: 0.3),
-                    ),
-                  ],
+          // 1. KOP SURAT 3 KOLOM DENGAN GARIS PEMISAH VERTIKAL HITAM
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Kolom Kiri: Logo Pilkades Karangmukti
+                Container(
+                  width: 90,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Image.asset(
+                    'assets/images/pilkades-logo.png',
+                    width: 82,
+                    height: 82,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.how_to_vote, size: 60, color: Colors.indigo),
+                  ),
                 ),
-              ),
-              SizedBox(
-                width: 75,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'No Urut DPT',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black87),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      '$dptNo',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black),
-                    ),
-                  ],
+
+                // Garis Vertikal Pemisah 1
+                Container(
+                  width: 1.8,
+                  color: Colors.black,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
                 ),
-              ),
-            ],
+
+                // Kolom Tengah: Judul Resmi Surat Undangan
+                const Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'SURAT UNDANGAN',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.black, letterSpacing: 0.5),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'PEMUNGUTAN SUARA',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.black, letterSpacing: 0.5),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'KEPADA PEMILIH',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.black, letterSpacing: 0.5),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Garis Vertikal Pemisah 2
+                Container(
+                  width: 1.8,
+                  color: Colors.black,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+
+                // Kolom Kanan: No Urut DPT
+                Container(
+                  width: 85,
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'No Urut DPT',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
+                      ),
+                      Text(
+                        '$dptNo',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.black, height: 1.1),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
 
-          const SizedBox(height: 16),
+          // Garis Horizontal Pemisah Header
+          Container(
+            height: 2.0,
+            color: Colors.black,
+            margin: const EdgeInsets.only(top: 10, bottom: 14),
+          ),
 
-          // 2. BARIS QR CODE (Kiri) & KOTAK INSTRUKSI (Kanan)
+          // 2. BARIS QR CODE (KIRI) & KOTAK INSTRUKSI (KANAN)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // QR Code di Kiri (Besar, jelas, mudah discan)
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.black12, width: 0.5),
-                ),
-                padding: const EdgeInsets.all(2),
-                child: QrImageView(
-                  data: tokenCode,
-                  version: QrVersions.auto,
-                  size: 110.0,
-                  padding: EdgeInsets.zero,
-                  backgroundColor: Colors.white,
-                ),
+              // QR Code di Kiri (Besar, tajam, jelas)
+              QrImageView(
+                data: tokenCode,
+                version: QrVersions.auto,
+                size: 118.0,
+                padding: EdgeInsets.zero,
+                backgroundColor: Colors.white,
               ),
 
               const SizedBox(width: 14),
 
-              // Kotak Berbingkai di Kanan
+              // Dua Kotak Berbingkai di Kanan
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -502,20 +544,21 @@ class _InvitationScreenState extends State<InvitationScreen> {
                     const SizedBox(height: 4),
                     // Kotak 1: Merah (SURAT UNDANGAN INI BERSIFAT RAHASIA)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        border: Border.all(color: const Color(0xFFD32F2F), width: 1.2),
+                        border: Border.all(color: const Color(0xFFE53935), width: 1.8),
+                        borderRadius: BorderRadius.circular(3),
                       ),
                       child: const Center(
                         child: Text(
                           'SURAT UNDANGAN INI BERSIFAT RAHASIA',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Color(0xFFD32F2F),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10.5,
-                            letterSpacing: 0.2,
+                            color: Color(0xFFE53935),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 11.5,
+                            letterSpacing: 0.3,
                           ),
                         ),
                       ),
@@ -523,21 +566,22 @@ class _InvitationScreenState extends State<InvitationScreen> {
 
                     const SizedBox(height: 10),
 
-                    // Kotak 2: Border Gelap (Tunjukan QRcode berikut saat akan memilih)
+                    // Kotak 2: Border Hitam (Tunjukan QRcode berikut saat akan memilih)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        border: Border.all(color: Colors.black87, width: 1.0),
+                        border: Border.all(color: Colors.black, width: 1.8),
+                        borderRadius: BorderRadius.circular(3),
                       ),
                       child: const Center(
                         child: Text(
                           'Tunjukan QRcode berikut saat akan memilih',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -548,27 +592,27 @@ class _InvitationScreenState extends State<InvitationScreen> {
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // 3. PARAGRAF UNDANGAN RESMI
           Text.rich(
             TextSpan(
               text: 'Bersama ini diberitahukan bahwa Panitia Pemilihan mengundang Saudara/i\n',
-              style: const TextStyle(fontSize: 10.5, color: Colors.black87, height: 1.35),
+              style: const TextStyle(fontSize: 11, color: Colors.black, height: 1.35),
               children: [
                 TextSpan(
                   text: '$voterName ',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                  style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black),
                 ),
                 const TextSpan(text: 'NIK '),
                 TextSpan(
                   text: '$nik ',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                  style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black),
                 ),
                 const TextSpan(text: 'untuk memberikan suara\npada pemilihan: '),
                 const TextSpan(
-                  text: 'PEMILIHAN KEPALA DESA KARANG MUKTI ',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                  text: 'PEMILIHAN KEPALA DESA KARANGMUKTI ',
+                  style: TextStyle(fontWeight: FontWeight.w900, color: Colors.black),
                 ),
                 const TextSpan(text: 'yang akan\ndilaksanakan pada:'),
               ],
@@ -579,14 +623,14 @@ class _InvitationScreenState extends State<InvitationScreen> {
 
           // 4. TABEL JADWAL & LOKASI PEMILIHAN
           Padding(
-            padding: const EdgeInsets.only(left: 4),
+            padding: const EdgeInsets.only(left: 2),
             child: Column(
               children: [
-                _buildScheduleRow('Hari/Tanggal', 'Minggu, 22 November 2026'),
+                _buildScheduleRow('Hari/Tanggal', 'Minggu, 06 Desember 2026', isBold: true),
                 _buildScheduleRow('Pukul', '07:00 s/d 14:00 WIB'),
-                _buildScheduleRow('Nomor TPS', 'TPS 1'),
-                _buildScheduleRow('Alamat TPS', 'Jalan Merak Ngibing Nomor 12'),
-                _buildScheduleRow('Nomor Bilik Suara', 'Bilik Suara Nomor 1'),
+                _buildScheduleRow('Nomor TPS', formattedTps),
+                _buildScheduleRow('Alamat TPS', formattedAddress),
+                _buildScheduleRow('Nomor Bilik Suara', formattedBilik),
               ],
             ),
           ),
@@ -597,7 +641,7 @@ class _InvitationScreenState extends State<InvitationScreen> {
           const Text.rich(
             TextSpan(
               text: 'Catatan : ',
-              style: TextStyle(fontSize: 9.5, color: Colors.black87, fontWeight: FontWeight.bold, height: 1.35),
+              style: TextStyle(fontSize: 10, color: Colors.black, fontWeight: FontWeight.bold, height: 1.35),
               children: [
                 TextSpan(
                   text:
@@ -609,9 +653,9 @@ class _InvitationScreenState extends State<InvitationScreen> {
             textAlign: TextAlign.justify,
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
-          // 6. TANDA TANGAN (Kiri: Penerima, Kanan: Panitia Pemilihan)
+          // 6. TANDA TANGAN (Kiri: Penerima, Kanan: Panitia Pemilihan Subang)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -620,36 +664,29 @@ class _InvitationScreenState extends State<InvitationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('..................., ............ 2026', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    const Text('..................., ............ 2026', style: TextStyle(fontSize: 10.5, color: Colors.black)),
                     const SizedBox(height: 2),
-                    const Text('Yang Menerima,', style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    const Text('Yang Menerima,', style: TextStyle(fontSize: 10.5, color: Colors.black)),
                     const SizedBox(height: 42),
                     Text(
                       voterName,
-                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.black),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.black),
                     ),
                   ],
                 ),
               ),
 
-              // Kolom Kanan: Panitia Pemilihan Ketua
-              Expanded(
+              // Kolom Kanan: Panitia Pemilihan Ketua Subang
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Subang, 10 November 2026', style: TextStyle(fontSize: 10, color: Colors.black87)),
-                    const SizedBox(height: 1),
-                    const Text('PANITIA PEMILIHAN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black)),
-                    const Text('Ketua,', style: TextStyle(fontSize: 10, color: Colors.black87)),
-                    const SizedBox(height: 2),
-                    Image.asset(
-                      'assets/images/kpps_signature.png',
-                      height: 42,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const SizedBox(height: 42),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text('Lulu Lukman', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black)),
+                    Text('Subang, 10 November 2026', style: TextStyle(fontSize: 10.5, color: Colors.black)),
+                    SizedBox(height: 2),
+                    Text('PANITIA PEMILIHAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.black)),
+                    Text('Ketua,', style: TextStyle(fontSize: 10.5, color: Colors.black)),
+                    SizedBox(height: 38),
+                    Text('Kasda, S.T., M.T', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: Colors.black)),
                   ],
                 ),
               ),
@@ -658,41 +695,53 @@ class _InvitationScreenState extends State<InvitationScreen> {
 
           const SizedBox(height: 14),
 
-          // 7. BAGIAN BAWAH: KOTAK PANDUAN POSISI TANGAN + FOTO TANGAN + TANGGAL CETAK
+          // 7. BAGIAN BAWAH: NAMA PEMILIH, KOTAK PANDUAN POSISI TANGAN, GAMBAR JEMPOL, TANGGAL CETAK
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Kotak Instruksi Letak Tangan
-              Container(
-                width: 130,
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black87, width: 0.9),
-                ),
-                child: const Text(
-                  'Letakan posisi tangan\nditengah-tengah ujung\nbawah persis seperti\npada gambar untuk\nmemudahkan proses\nscan QRcode',
-                  style: TextStyle(fontSize: 8.5, height: 1.25, color: Colors.black87),
-                ),
+              // Kolom Kiri: Nama Pemilih + Kotak Instruksi Letak Tangan
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    voterName,
+                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: Colors.black),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 140,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.black, width: 1.4),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'Letakan posisi tangan\nditengah-tengah ujung\nbawah persis seperti\npada gambar untuk\nmemudahkan proses\nscan QRcode',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 9, height: 1.25, fontWeight: FontWeight.w600, color: Colors.black),
+                    ),
+                  ),
+                ],
               ),
 
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
 
-              // Foto Panduan Posisi Tangan Memegang Ujung Kertas
+              // Gambar Ilustrasi Jempol & Sensor Scan (hand_guide.png)
               Image.asset(
                 'assets/images/hand_guide.png',
-                height: 65,
+                height: 78,
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(Icons.thumb_up, size: 50, color: Colors.indigo),
+                errorBuilder: (_, __, ___) => const Icon(Icons.fingerprint, size: 60, color: Colors.red),
               ),
 
               const Spacer(),
 
-              // Tanggal & Waktu Cetak
+              // Tanggal & Waktu Cetak (Italic)
               Padding(
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
                   'Tgl cetak: $printTime',
-                  style: const TextStyle(fontSize: 9, color: Colors.black87),
+                  style: const TextStyle(fontSize: 9.5, fontStyle: FontStyle.italic, color: Colors.black),
                 ),
               ),
             ],
@@ -702,24 +751,28 @@ class _InvitationScreenState extends State<InvitationScreen> {
     );
   }
 
-  Widget _buildScheduleRow(String label, String value) {
+  Widget _buildScheduleRow(String label, String value, {bool isBold = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 3),
+      padding: const EdgeInsets.only(bottom: 3.5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
-            child: Text(label, style: const TextStyle(fontSize: 10, color: Colors.black87)),
+            width: 135,
+            child: Text(label, style: const TextStyle(fontSize: 10.8, color: Colors.black, fontWeight: FontWeight.w600)),
           ),
           const SizedBox(
-            width: 12,
-            child: Text(':', style: TextStyle(fontSize: 10, color: Colors.black87)),
+            width: 14,
+            child: Text(':', style: TextStyle(fontSize: 10.8, color: Colors.black, fontWeight: FontWeight.w600)),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 10.8,
+                color: Colors.black,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              ),
             ),
           ),
         ],
