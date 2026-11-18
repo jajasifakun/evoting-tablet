@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/models.dart';
-import 'home_screen.dart';
+import 'qr_scanner_screen.dart';
 
 class SuccessScreen extends StatefulWidget {
   final Candidate? candidate;
@@ -13,7 +13,7 @@ class SuccessScreen extends StatefulWidget {
 }
 
 class _SuccessScreenState extends State<SuccessScreen> {
-  int _countdown = 4;
+  int _countdown = 3;
   Timer? _timer;
 
   @override
@@ -29,16 +29,17 @@ class _SuccessScreenState extends State<SuccessScreen> {
         setState(() => _countdown--);
       } else {
         _timer?.cancel();
-        _goToHome();
+        _goToScanner();
       }
     });
   }
 
-  void _goToHome() {
+  void _goToScanner() {
     if (!mounted) return;
+    _timer?.cancel();
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
       (route) => false,
     );
   }
@@ -55,7 +56,7 @@ class _SuccessScreenState extends State<SuccessScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
         child: GestureDetector(
-          onTap: _goToHome, // Memungkinkan klik di mana saja jika ingin kembali lebih cepat
+          onTap: _goToScanner, // Sentuh layar untuk langsung buka kamera scan tanpa menunggu
           behavior: HitTestBehavior.opaque,
           child: Center(
             child: SingleChildScrollView(
@@ -239,7 +240,7 @@ class _SuccessScreenState extends State<SuccessScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Hitung Mundur Otomatis Kembali ke Mulai Pemilihan
+                    // Hitung Mundur Otomatis Langsung Mengaktifkan Kamera Scan QR
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       decoration: BoxDecoration(
@@ -254,14 +255,14 @@ class _SuccessScreenState extends State<SuccessScreen> {
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
-                              value: _countdown / 4.0,
+                              value: _countdown / 3.0,
                               strokeWidth: 2.5,
                               color: Colors.indigo.shade700,
                             ),
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            'Otomatis kembali ke Mulai Pemilihan dalam $_countdown detik...',
+                            'Kamera scan QR aktif otomatis dalam $_countdown detik...',
                             style: TextStyle(
                               color: Colors.indigo.shade900,
                               fontWeight: FontWeight.bold,
@@ -270,6 +271,22 @@ class _SuccessScreenState extends State<SuccessScreen> {
                           ),
                         ],
                       ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Tombol Buka Kamera Sekarang
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        elevation: 2,
+                      ),
+                      icon: const Icon(Icons.qr_code_scanner, size: 20),
+                      label: const Text('Langsung Buka Kamera Scan QR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      onPressed: _goToScanner,
                     ),
                   ],
                 ),
