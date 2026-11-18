@@ -12,7 +12,9 @@ class ThermalPrinterService {
   bool autoPrintEnabled = true;
   String? connectedPrinterName;
   String? connectedPrinterAddress;
+  String? connectionType; // 'USB' | 'BLUETOOTH' | null
 
+  // ==================== BLUETOOTH ====================
   Future<List<Map<String, String>>> getPairedDevices() async {
     try {
       final List<dynamic>? result = await _channel.invokeMethod('getPairedDevices');
@@ -35,6 +37,7 @@ class ThermalPrinterService {
       if (success == true) {
         connectedPrinterAddress = address;
         connectedPrinterName = name;
+        connectionType = 'BLUETOOTH';
         return true;
       }
       return false;
@@ -46,11 +49,52 @@ class ThermalPrinterService {
   Future<void> disconnect() async {
     try {
       await _channel.invokeMethod('disconnect');
-      connectedPrinterAddress = null;
-      connectedPrinterName = null;
+      if (connectionType == 'BLUETOOTH') {
+        connectedPrinterAddress = null;
+        connectedPrinterName = null;
+        connectionType = null;
+      }
     } catch (_) {}
   }
 
+  // ==================== USB CABLE (OTG) ====================
+  Future<List<Map<String, dynamic>>> getUsbDevices() async {
+    try {
+      final List<dynamic>? result = await _channel.invokeMethod('getUsbDevices');
+      if (result == null) return [];
+      return result.map((item) => Map<String, dynamic>.from(item)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<bool> connectUsb(String? deviceId, String name) async {
+    try {
+      final bool? success = await _channel.invokeMethod('connectUsb', {'deviceId': deviceId});
+      if (success == true) {
+        connectedPrinterName = name;
+        connectedPrinterAddress = deviceId;
+        connectionType = 'USB';
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> disconnectUsb() async {
+    try {
+      await _channel.invokeMethod('disconnectUsb');
+      if (connectionType == 'USB') {
+        connectedPrinterAddress = null;
+        connectedPrinterName = null;
+        connectionType = null;
+      }
+    } catch (_) {}
+  }
+
+  // ==================== STATUS & AUTO-CONNECT ====================
   Future<bool> isConnected() async {
     try {
       final bool? connected = await _channel.invokeMethod('isConnected');
@@ -60,6 +104,43 @@ class ThermalPrinterService {
     }
   }
 
+  Future<Map<String, dynamic>> getConnectionStatus() async {
+    try {
+      final res = await _channel.invokeMethod('getConnectionStatus');
+      if (res is Map) {
+        final map = Map<String, dynamic>.from(res);
+        if (map['connected'] == true) {
+          connectionType = map['type']?.toString();
+          connectedPrinterName = map['name']?.toString();
+        } else {
+          connectionType = null;
+          connectedPrinterName = null;
+        }
+        return map;
+      }
+    } catch (_) {}
+    return {'connected': false, 'type': 'NONE', 'name': null};
+  }
+
+  /// Otomatis mendeteksi dan menghubungkan ke Printer Kabel USB atau Bluetooth
+  Future<bool> autoConnect() async {
+    try {
+      final res = await _channel.invokeMethod('autoConnect');
+      if (res is Map) {
+        final map = Map<String, dynamic>.from(res);
+        if (map['success'] == true) {
+          connectionType = map['type']?.toString();
+          connectedPrinterName = map['name']?.toString() ?? (connectionType == 'USB' ? 'Printer Kabel USB' : 'Printer Bluetooth');
+          return true;
+        }
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ==================== PDF ENGINE ====================
   /// Buat file PDF dari gambar kartu undangan dan simpan ke memori perangkat
   Future<Map<String, dynamic>> createSinglePdf(String fileName, Uint8List bytes) async {
     try {
@@ -142,6 +223,7 @@ class ThermalPrinterService {
     }
   }
 
+  // ==================== CETAK STRUK VVPAT (KOTAK SUARA) ====================
   /// Format dan kirim cetak struk bukti memilih (VVPAT) ke kotak suara fisik
   Future<bool> printVoteReceipt({
     required String candidateName,
@@ -152,6 +234,12 @@ class ThermalPrinterService {
     String? voterName,
     String? voterNik,
   }) async {
+    // 1. Pastikan koneksi printer aktif, jika belum aktif coba auto-connect
+    final bool connected = await isConnected();
+    if (!connected) {
+      await autoConnect();
+    }
+
     final bytes = generateReceiptBytes(
       candidateName: candidateName,
       candidateLetter: candidateLetter,
@@ -183,7 +271,7 @@ class ThermalPrinterService {
     );
   }
 
-  /// Pembuat perintah biner ESC/POS standar 58mm
+  /// Pembuat perintah biner ESC/POS standar 58mm / 80mm
   Uint8List generateReceiptBytes({
     required String candidateName,
     required String candidateLetter,

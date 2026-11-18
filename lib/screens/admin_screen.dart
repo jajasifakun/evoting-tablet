@@ -19,6 +19,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   List<Voter> _votersList = [];
   List<Map<String, dynamic>> _tokensList = [];
   List<Map<String, String>> _pairedPrinters = [];
+  List<Map<String, dynamic>> _usbPrinters = [];
+  int _printerModeIndex = 0; // 0 = Bluetooth, 1 = USB OTG
   bool _isConnectingPrinter = false;
   bool _isLoading = true;
 
@@ -28,12 +30,23 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     _tabController = TabController(length: 6, vsync: this);
     _loadAllData();
     _loadPairedPrinters();
+    _loadUsbPrinters();
+    ThermalPrinterService.instance.getConnectionStatus().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _loadPairedPrinters() async {
     final list = await ThermalPrinterService.instance.getPairedDevices();
     if (mounted) {
       setState(() => _pairedPrinters = list);
+    }
+  }
+
+  Future<void> _loadUsbPrinters() async {
+    final list = await ThermalPrinterService.instance.getUsbDevices();
+    if (mounted) {
+      setState(() => _usbPrinters = list);
     }
   }
 
@@ -672,28 +685,30 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     );
   }
 
-  // --- TAB 5: PENGATURAN PRINTER THERMAL KOTAK SUARA ---
+  // --- TAB 5: PENGATURAN PRINTER THERMAL KOTAK SUARA (KABEL USB + BLUETOOTH) ---
   Widget _buildThermalPrinterTab() {
     final printer = ThermalPrinterService.instance;
+    final isConnected = printer.connectedPrinterName != null;
+    final isUsb = printer.connectionType == 'USB';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Banner Status
+          // Banner Status Koneksi
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: printer.connectedPrinterName != null ? Colors.green.shade50 : Colors.amber.shade50,
+              color: isConnected ? Colors.green.shade50 : Colors.amber.shade50,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: printer.connectedPrinterName != null ? Colors.green.shade300 : Colors.amber.shade300),
+              border: Border.all(color: isConnected ? Colors.green.shade400 : Colors.amber.shade400, width: 1.5),
             ),
             child: Row(
               children: [
                 Icon(
-                  printer.connectedPrinterName != null ? Icons.print : Icons.print_disabled,
-                  color: printer.connectedPrinterName != null ? Colors.green.shade800 : Colors.amber.shade900,
+                  isConnected ? (isUsb ? Icons.usb : Icons.print) : Icons.print_disabled,
+                  color: isConnected ? Colors.green.shade800 : Colors.amber.shade900,
                   size: 36,
                 ),
                 const SizedBox(width: 16),
@@ -701,21 +716,39 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        printer.connectedPrinterName != null
-                            ? 'Printer Terhubung: ${printer.connectedPrinterName}'
-                            : 'Printer Thermal Belum Terhubung',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                          color: printer.connectedPrinterName != null ? Colors.green.shade900 : Colors.amber.shade900,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              isConnected
+                                  ? 'Terhubung: ${printer.connectedPrinterName}'
+                                  : 'Printer Thermal Belum Terhubung',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                                color: isConnected ? Colors.green.shade900 : Colors.amber.shade900,
+                              ),
+                            ),
+                          ),
+                          if (isConnected)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isUsb ? Colors.teal.shade700 : Colors.blue.shade700,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                isUsb ? 'KABEL USB' : 'BLUETOOTH',
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        printer.connectedPrinterName != null
-                            ? 'Struk bukti coblos fisik akan otomatis dicetak saat pemilih menekan YA di bilik suara.'
-                            : 'Aplikasi berjalan dalam mode Simulasi Layar (struk digital ditampilkan di layar tablet & bisa dicetak jika printer Bluetooth dihubungkan).',
+                        isConnected
+                          ? 'Printer siap mencetak bukti struk fisik ke dalam kotak suara saat pemilih mencoblos.'
+                          : 'Hubungkan printer kasir thermal kecil (58mm/80mm) menggunakan Kabel USB (OTG) atau Bluetooth.',
                         style: const TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.3),
                       ),
                     ],
@@ -725,9 +758,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // Switch Otomatis Cetak
+          // Switch Otomatis Cetak & Tombol Auto-Connect
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -738,13 +771,15 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Cetak Otomatis Struk ke Kotak Suara', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    SizedBox(height: 2),
-                    Text('Keluarkan struk fisik sesaat setelah pemilih mencoblos', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  ],
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Cetak Otomatis Struk ke Kotak Suara', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                      SizedBox(height: 2),
+                      Text('Struk fisik otomatis keluar saat pemilih memilih calon', style: TextStyle(fontSize: 11.5, color: Colors.grey)),
+                    ],
+                  ),
                 ),
                 Switch(
                   value: printer.autoPrintEnabled,
@@ -757,42 +792,56 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
-          // Tombol Aksi Uji Coba & Scan
+          // Tombol Uji Cetak & Hubungkan Otomatis
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
+                    backgroundColor: Colors.indigo.shade700,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  icon: const Icon(Icons.bluetooth_searching),
-                  label: const Text('Cari Printer Bluetooth', style: TextStyle(fontWeight: FontWeight.bold)),
-                  onPressed: _loadPairedPrinters,
+                  icon: const Icon(Icons.flash_on, size: 18),
+                  label: const Text('Auto-Connect Printer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  onPressed: () async {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Mencari printer kabel USB & Bluetooth...'), duration: Duration(seconds: 1)),
+                    );
+                    final ok = await printer.autoConnect();
+                    await _loadPairedPrinters();
+                    await _loadUsbPrinters();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(ok ? 'Berhasil terhubung ke ${printer.connectedPrinterName}!' : 'Tidak ditemukan printer aktif. Pastikan kabel OTG / Bluetooth aktif.'),
+                        backgroundColor: ok ? Colors.green : Colors.orange,
+                      ),
+                    );
+                  },
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade700,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  icon: const Icon(Icons.receipt_long),
-                  label: const Text('Test Cetak Struk Contoh', style: TextStyle(fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.receipt_long, size: 18),
+                  label: const Text('Test Cetak Struk', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   onPressed: () async {
                     final ok = await printer.printTestReceipt();
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(ok ? 'Perintah cetak terkirim ke printer thermal!' : 'Printer belum terhubung via Bluetooth.'),
-                        backgroundColor: ok ? Colors.green : Colors.orange,
+                        content: Text(ok ? 'Perintah cetak terkirim ke printer thermal!' : 'Gagal mencetak. Hubungkan via Kabel USB atau Bluetooth terlebih dahulu.'),
+                        backgroundColor: ok ? Colors.green : Colors.red,
                       ),
                     );
                   },
@@ -801,102 +850,306 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             ],
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          const Text(
-            'DAFTAR PERANGKAT BLUETOOTH TERPASANG (PAIRED):',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF0F172A)),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Pastikan printer thermal kasir kecil (58mm/80mm) sudah Anda pasangkan (pair) di menu Bluetooth tablet/HP terlebih dahulu.',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-          const SizedBox(height: 12),
-
-          if (_pairedPrinters.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: const Center(
-                child: Text(
-                  'Belum ada printer Bluetooth terdeteksi.\nBuka Pengaturan Bluetooth tablet/HP, nyalakan printer thermal, dan pasangkan (pair) printer Anda.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12.5, color: Colors.grey, height: 1.4),
-                ),
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _pairedPrinters.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (ctx, idx) {
-                final p = _pairedPrinters[idx];
-                final name = p['name'] ?? 'Printer Thermal';
-                final addr = p['address'] ?? '';
-                final isConnected = printer.connectedPrinterAddress == addr;
-
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isConnected ? Colors.green : Colors.grey.shade200, width: isConnected ? 2 : 1),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.print, color: isConnected ? Colors.green : Colors.indigo),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            Text(addr, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                          ],
-                        ),
-                      ),
-                      if (isConnected)
-                        OutlinedButton(
-                          onPressed: () async {
-                            await printer.disconnect();
-                            setState(() {});
-                          },
-                          child: const Text('Putuskan'),
-                        )
-                      else
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo.shade600,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: _isConnectingPrinter
-                              ? null
-                              : () async {
-                                  setState(() => _isConnectingPrinter = true);
-                                  final ok = await printer.connect(addr, name);
-                                  setState(() => _isConnectingPrinter = false);
-                                  if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(ok ? 'Berhasil terhubung ke $name!' : 'Gagal menghubungkan ke $name.'),
-                                      backgroundColor: ok ? Colors.green : Colors.red,
-                                    ),
-                                  );
-                                },
-                          child: const Text('Hubungkan'),
-                        ),
-                    ],
-                  ),
-                );
-              },
+          // TAB PILIHAN METODE KONEKSI (BLUETOOTH vs KABEL USB)
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => setState(() => _printerModeIndex = 0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _printerModeIndex == 0 ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: _printerModeIndex == 0 ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)] : null,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.bluetooth, size: 18, color: _printerModeIndex == 0 ? Colors.blue.shade700 : Colors.grey),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Koneksi Bluetooth',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12.5,
+                              color: _printerModeIndex == 0 ? Colors.blue.shade800 : Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () {
+                      setState(() => _printerModeIndex = 1);
+                      _loadUsbPrinters();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _printerModeIndex == 1 ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: _printerModeIndex == 1 ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)] : null,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.usb, size: 18, color: _printerModeIndex == 1 ? Colors.teal.shade700 : Colors.grey),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Koneksi Kabel USB (OTG)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12.5,
+                              color: _printerModeIndex == 1 ? Colors.teal.shade800 : Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ISI METODE 1: KONEKSI BLUETOOTH
+          if (_printerModeIndex == 0) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'DAFTAR PRINTER BLUETOOTH (PAIRED):',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF0F172A)),
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Refresh', style: TextStyle(fontSize: 12)),
+                  onPressed: _loadPairedPrinters,
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (_pairedPrinters.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: const Text(
+                  'Belum ada printer Bluetooth terdeteksi.\n1. Nyalakan printer thermal kecil Anda.\n2. Buka Pengaturan Bluetooth tablet/HP dan pasangkan (pair) printer.\n3. Tekan Refresh di atas.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _pairedPrinters.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (ctx, idx) {
+                  final p = _pairedPrinters[idx];
+                  final name = p['name'] ?? 'Printer Thermal';
+                  final addr = p['address'] ?? '';
+                  final isConn = printer.connectedPrinterAddress == addr && printer.connectionType == 'BLUETOOTH';
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isConn ? Colors.green : Colors.grey.shade200, width: isConn ? 2 : 1),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.bluetooth, color: isConn ? Colors.green : Colors.blue.shade700),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                              Text(addr, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                        if (isConn)
+                          OutlinedButton(
+                            onPressed: () async {
+                              await printer.disconnect();
+                              setState(() {});
+                            },
+                            child: const Text('Putuskan'),
+                          )
+                        else
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue.shade700,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: _isConnectingPrinter
+                                ? null
+                                : () async {
+                                    setState(() => _isConnectingPrinter = true);
+                                    final ok = await printer.connect(addr, name);
+                                    setState(() => _isConnectingPrinter = false);
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(ok ? 'Berhasil terhubung ke $name via Bluetooth!' : 'Gagal menghubungkan ke $name.'),
+                                        backgroundColor: ok ? Colors.green : Colors.red,
+                                      ),
+                                    );
+                                  },
+                            child: const Text('Hubungkan'),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
+
+          // ISI METODE 2: KONEKSI KABEL USB (OTG)
+          if (_printerModeIndex == 1) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'DAFTAR PRINTER KABEL USB (OTG):',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF0F172A)),
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Pindai USB', style: TextStyle(fontSize: 12)),
+                  onPressed: _loadUsbPrinters,
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.teal.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.teal.shade200),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.teal, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Tancapkan kabel data USB printer ke tablet/HP menggunakan adaptor USB OTG (Type-C atau Micro USB). Koneksi kabel sangat cepat dan tidak memerlukan pairing.',
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFF134E4A), height: 1.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (_usbPrinters.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: const Text(
+                  'Belum ada printer USB yang tertancap.\nPastikan kabel printer terhubung ke port charger tablet/HP dengan adaptor OTG, nyalakan printer, lalu tekan tombol "Pindai USB".',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _usbPrinters.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (ctx, idx) {
+                  final u = _usbPrinters[idx];
+                  final name = u['name']?.toString() ?? 'Printer USB Kasir';
+                  final devId = u['deviceId']?.toString() ?? '';
+                  final isConn = printer.connectedPrinterAddress == devId && printer.connectionType == 'USB';
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isConn ? Colors.green : Colors.grey.shade200, width: isConn ? 2 : 1),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.usb, color: isConn ? Colors.green : Colors.teal.shade700),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                              Text('Device ID: $devId (Vendor: ${u['vendorId'] ?? '-'})', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                        if (isConn)
+                          OutlinedButton(
+                            onPressed: () async {
+                              await printer.disconnectUsb();
+                              setState(() {});
+                            },
+                            child: const Text('Putuskan'),
+                          )
+                        else
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal.shade700,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: _isConnectingPrinter
+                                ? null
+                                : () async {
+                                    setState(() => _isConnectingPrinter = true);
+                                    final ok = await printer.connectUsb(devId, name);
+                                    setState(() => _isConnectingPrinter = false);
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(ok ? 'Berhasil terhubung ke $name via Kabel USB!' : 'Gagal menghubungkan ke $name. Periksa izin USB.'),
+                                        backgroundColor: ok ? Colors.green : Colors.red,
+                                      ),
+                                    );
+                                  },
+                            child: const Text('Hubungkan Kabel'),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
         ],
       ),
     );

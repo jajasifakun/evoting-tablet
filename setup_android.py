@@ -13,6 +13,7 @@ def main():
 
         perms = """    <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
@@ -23,6 +24,9 @@ def main():
 """
         if "android.permission.CAMERA" not in content:
             content = content.replace("<application", perms + "    <application")
+
+        if "android.hardware.usb.host" not in content:
+            content = content.replace("<application", '    <uses-feature android:name="android.hardware.usb.host" android:required="false" />\n    <application')
 
         if 'android:requestLegacyExternalStorage="true"' not in content:
             content = content.replace("<application", '<application android:requestLegacyExternalStorage="true"')
@@ -106,16 +110,18 @@ def main():
 </resources>""")
         print("Launcher icons set successfully.")
 
-    # 3. Update MainActivity.kt dengan Native Bluetooth ESC/POS + Native PDF Generator Channel
+    # 3. Update MainActivity.kt dengan Dual Thermal Printer (Bluetooth + USB Cable OTG) & Native PDF Generator
     kt_code = """package com.evoting.evoting_karangmukti
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import android.app.PendingIntent
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -123,6 +129,12 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
+import android.hardware.usb.UsbConstants
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbDeviceConnection
+import android.hardware.usb.UsbEndpoint
+import android.hardware.usb.UsbInterface
+import android.hardware.usb.UsbManager
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
@@ -136,8 +148,20 @@ import java.util.UUID
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.evoting/thermal_printer"
+
+    // Bluetooth printer state
     private var bluetoothSocket: BluetoothSocket? = null
     private var outputStream: OutputStream? = null
+    private var connectedBtName: String? = null
+    private var connectedBtAddress: String? = null
+
+    // USB Cable printer state
+    private var usbManager: UsbManager? = null
+    private var usbConnection: UsbDeviceConnection? = null
+    private var usbInterface: UsbInterface? = null
+    private var usbEndpointOut: UsbEndpoint? = null
+    private var connectedUsbName: String? = null
+    private var connectedUsbDeviceId: String? = null
 
     // Multi-page PDF generator state
     private var activePdfDocument: PdfDocument? = null
@@ -146,8 +170,11 @@ class MainActivity: FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
+                // ==================== BLUETOOTH PRINTER ====================
                 "getPairedDevices" -> {
                     try {
                         val adapter = BluetoothAdapter.getDefaultAdapter()
@@ -165,56 +192,121 @@ class MainActivity: FlutterActivity() {
                 }
                 "connect" -> {
                     val address = call.argument<String>("address")
-                    val adapter = BluetoothAdapter.getDefaultAdapter()
-                    val device = adapter?.getRemoteDevice(address)
-                    if (device != null) {
-                        Thread {
-                            try {
-                                outputStream?.close()
-                                bluetoothSocket?.close()
-                                val sppUuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
-                                bluetoothSocket = device.createRfcommSocketToServiceRecord(sppUuid)
-                                bluetoothSocket?.connect()
-                                outputStream = bluetoothSocket?.outputStream
-                                runOnUiThread { result.success(true) }
-                            } catch (e: Exception) {
-                                outputStream = null
-                                bluetoothSocket = null
-                                runOnUiThread { result.success(false) }
-                            }
-                        }.start()
-                    } else {
+                    if (address.isNullOrEmpty()) {
                         result.success(false)
+                        return@setMethodCallHandler
                     }
+                    Thread {
+                        val ok = connectBluetoothInternal(address)
+                        runOnUiThread { result.success(ok) }
+                    }.start()
+                }
+                "disconnect" -> {
+                    disconnectBluetoothInternal()
+                    result.success(true)
+                }
+
+                // ==================== USB CABLE PRINTER ====================
+                "getUsbDevices" -> {
+                    val list = getUsbPrintersInternal()
+                    result.success(list)
+                }
+                "connectUsb" -> {
+                    val deviceId = call.argument<String>("deviceId")
+                    val ok = connectUsbInternal(deviceId)
+                    result.success(ok)
+                }
+                "disconnectUsb" -> {
+                    disconnectUsbInternal()
+                    result.success(true)
+                }
+
+                // ==================== COMMON PRINTER STATUS & AUTO-CONNECT ====================
+                "isConnected" -> {
+                    val isUsb = (usbConnection != null && usbEndpointOut != null)
+                    val isBt = (bluetoothSocket?.isConnected == true)
+                    result.success(isUsb || isBt)
+                }
+                "getConnectionStatus" -> {
+                    val isUsb = (usbConnection != null && usbEndpointOut != null)
+                    val isBt = (bluetoothSocket?.isConnected == true)
+                    val map = mutableMapOf<String, Any?>()
+                    map["connected"] = (isUsb || isBt)
+                    if (isUsb) {
+                        map["type"] = "USB"
+                        map["name"] = connectedUsbName ?: "Printer Kabel USB"
+                    } else if (isBt) {
+                        map["type"] = "BLUETOOTH"
+                        map["name"] = connectedBtName ?: "Printer Bluetooth"
+                    } else {
+                        map["type"] = "NONE"
+                        map["name"] = null
+                    }
+                    result.success(map)
+                }
+                "autoConnect" -> {
+                    Thread {
+                        // 1. Cek USB terlebih dahulu (koneksi kabel prioritas tinggi & sangat stabil)
+                        val usbList = getUsbPrintersInternal()
+                        if (usbList.isNotEmpty()) {
+                            val firstUsb = usbList.first()
+                            val devId = firstUsb["deviceId"]?.toString()
+                            val usbOk = connectUsbInternal(devId)
+                            if (usbOk) {
+                                runOnUiThread {
+                                    result.success(mapOf(
+                                        "success" to true,
+                                        "type" to "USB",
+                                        "name" to (firstUsb["name"] ?: "Printer Kabel USB")
+                                    ))
+                                }
+                                return@Thread
+                            }
+                        }
+
+                        // 2. Jika tidak ada USB, cek printer Bluetooth yang sudah dipair
+                        val adapter = BluetoothAdapter.getDefaultAdapter()
+                        if (adapter != null && adapter.isEnabled) {
+                            val bonded = adapter.bondedDevices
+                            val matched = bonded.find { d ->
+                                val n = (d.name ?: "").lowercase()
+                                n.contains("print") || n.contains("pos") || n.contains("rpp") ||
+                                n.contains("mpt") || n.contains("thermal") || n.contains("58") || n.contains("80")
+                            } ?: bonded.firstOrNull()
+
+                            if (matched != null) {
+                                val btOk = connectBluetoothInternal(matched.address)
+                                if (btOk) {
+                                    runOnUiThread {
+                                        result.success(mapOf(
+                                            "success" to true,
+                                            "type" to "BLUETOOTH",
+                                            "name" to (matched.name ?: "Printer Bluetooth")
+                                        ))
+                                    }
+                                    return@Thread
+                                }
+                            }
+                        }
+
+                        runOnUiThread {
+                            result.success(mapOf("success" to false, "type" to "NONE"))
+                        }
+                    }.start()
                 }
                 "printRaw" -> {
                     val bytes = call.argument<ByteArray>("bytes")
-                    if (outputStream != null && bytes != null) {
+                    if (bytes != null && bytes.isNotEmpty()) {
                         Thread {
-                            try {
-                                outputStream?.write(bytes)
-                                outputStream?.flush()
-                                runOnUiThread { result.success(true) }
-                            } catch (e: Exception) {
-                                runOnUiThread { result.success(false) }
-                            }
+                            val sent = sendRawInternal(bytes)
+                            runOnUiThread { result.success(sent) }
                         }.start()
                     } else {
                         result.success(false)
                     }
                 }
-                "disconnect" -> {
-                    try {
-                        outputStream?.close()
-                        bluetoothSocket?.close()
-                    } catch (e: Exception) {}
-                    outputStream = null
-                    bluetoothSocket = null
-                    result.success(true)
-                }
-                "isConnected" -> {
-                    result.success(bluetoothSocket?.isConnected ?: false)
-                }
+
+                // ==================== PDF ENGINE & EXPORT ====================
                 "createSinglePdf" -> {
                     val fileName = call.argument<String>("fileName") ?: "Surat_Undangan_C6.pdf"
                     val bytes = call.argument<ByteArray>("bytes")
@@ -322,6 +414,215 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    // ==================== HELPER: BLUETOOTH ====================
+    private fun connectBluetoothInternal(address: String): Boolean {
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
+        val device = adapter.getRemoteDevice(address) ?: return false
+
+        try {
+            adapter.cancelDiscovery()
+            disconnectBluetoothInternal()
+
+            val sppUuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+            var socket: BluetoothSocket? = null
+
+            // 1. Percobaan standar UUID SPP
+            try {
+                socket = device.createRfcommSocketToServiceRecord(sppUuid)
+                socket.connect()
+            } catch (e1: Exception) {
+                // 2. Fallback reflection untuk printer thermal mini (PT-210, RPP, POS-58, dll)
+                try {
+                    val m = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                    socket = m.invoke(device, 1) as BluetoothSocket
+                    socket.connect()
+                } catch (e2: Exception) {
+                    socket?.close()
+                    return false
+                }
+            }
+
+            bluetoothSocket = socket
+            outputStream = socket?.outputStream
+            connectedBtName = device.name ?: "Printer Bluetooth"
+            connectedBtAddress = address
+            return true
+        } catch (e: Exception) {
+            disconnectBluetoothInternal()
+            return false
+        }
+    }
+
+    private fun disconnectBluetoothInternal() {
+        try {
+            outputStream?.close()
+            bluetoothSocket?.close()
+        } catch (e: Exception) {}
+        outputStream = null
+        bluetoothSocket = null
+        connectedBtName = null
+        connectedBtAddress = null
+    }
+
+    // ==================== HELPER: USB CABLE ====================
+    private fun getUsbPrintersInternal(): List<Map<String, Any>> {
+        val manager = usbManager ?: return emptyList()
+        val list = mutableListOf<Map<String, Any>>()
+
+        for (device in manager.deviceList.values) {
+            var isPrinter = (device.deviceClass == UsbConstants.USB_CLASS_PRINTER)
+            var hasBulkOut = false
+
+            for (i in 0 until device.interfaceCount) {
+                val iface = device.getInterface(i)
+                if (iface.interfaceClass == UsbConstants.USB_CLASS_PRINTER) {
+                    isPrinter = true
+                }
+                for (j in 0 until iface.endpointCount) {
+                    val ep = iface.getEndpoint(j)
+                    if (ep.direction == UsbConstants.USB_DIR_OUT && ep.type == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                        hasBulkOut = true
+                    }
+                }
+            }
+
+            if (isPrinter || hasBulkOut) {
+                val name = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    val prod = device.productName ?: "Printer Kasir USB"
+                    val mfg = device.manufacturerName ?: "Thermal"
+                    "$prod ($mfg)"
+                } else {
+                    "Printer USB (${device.deviceName})"
+                }
+                list.add(mapOf(
+                    "name" to name,
+                    "deviceId" to device.deviceId.toString(),
+                    "vendorId" to device.vendorId,
+                    "productId" to device.productId,
+                    "deviceName" to device.deviceName
+                ))
+            }
+        }
+        return list
+    }
+
+    private fun connectUsbInternal(deviceId: String?): Boolean {
+        val manager = usbManager ?: return false
+        val device = if (!deviceId.isNullOrEmpty()) {
+            manager.deviceList.values.find { it.deviceId.toString() == deviceId }
+        } else {
+            manager.deviceList.values.firstOrNull()
+        } ?: return false
+
+        try {
+            disconnectUsbInternal()
+
+            if (!manager.hasPermission(device)) {
+                val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+                val pi = PendingIntent.getBroadcast(this, 0, Intent("com.evoting.USB_PERMISSION"), flags)
+                manager.requestPermission(device, pi)
+            }
+
+            val conn = manager.openDevice(device) ?: return false
+
+            var targetIface: UsbInterface? = null
+            var targetEp: UsbEndpoint? = null
+
+            for (i in 0 until device.interfaceCount) {
+                val iface = device.getInterface(i)
+                for (j in 0 until iface.endpointCount) {
+                    val ep = iface.getEndpoint(j)
+                    if (ep.direction == UsbConstants.USB_DIR_OUT && ep.type == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                        targetIface = iface
+                        targetEp = ep
+                        break
+                    }
+                }
+                if (targetEp != null) break
+            }
+
+            if (targetIface == null || targetEp == null) {
+                conn.close()
+                return false
+            }
+
+            conn.claimInterface(targetIface, true)
+            usbConnection = conn
+            usbInterface = targetIface
+            usbEndpointOut = targetEp
+            connectedUsbDeviceId = device.deviceId.toString()
+            connectedUsbName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                device.productName ?: "Printer Kabel USB"
+            } else {
+                "Printer Kabel USB"
+            }
+            return true
+        } catch (e: Exception) {
+            disconnectUsbInternal()
+            return false
+        }
+    }
+
+    private fun disconnectUsbInternal() {
+        try {
+            if (usbConnection != null && usbInterface != null) {
+                usbConnection?.releaseInterface(usbInterface)
+            }
+            usbConnection?.close()
+        } catch (e: Exception) {}
+        usbConnection = null
+        usbInterface = null
+        usbEndpointOut = null
+        connectedUsbName = null
+        connectedUsbDeviceId = null
+    }
+
+    // ==================== HELPER: RAW DATA TRANSMISSION ====================
+    private fun sendRawInternal(bytes: ByteArray): Boolean {
+        // 1. Coba kirim via USB jika aktif
+        val conn = usbConnection
+        val ep = usbEndpointOut
+        if (conn != null && ep != null) {
+            try {
+                val count = conn.bulkTransfer(ep, bytes, bytes.size, 5000)
+                if (count >= 0) return true
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // 2. Coba kirim via Bluetooth jika aktif
+        val stream = outputStream
+        if (stream != null) {
+            try {
+                stream.write(bytes)
+                stream.flush()
+                return true
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // 3. Jika belum terhubung, coba auto-connect otomatis sekali lagi
+        try {
+            val usbPrinters = getUsbPrintersInternal()
+            if (usbPrinters.isNotEmpty()) {
+                val devId = usbPrinters.first()["deviceId"]?.toString()
+                if (connectUsbInternal(devId)) {
+                    val c = usbConnection
+                    val p = usbEndpointOut
+                    if (c != null && p != null) {
+                        val count = c.bulkTransfer(p, bytes, bytes.size, 5000)
+                        if (count >= 0) return true
+                    }
+                }
+            }
+        } catch (e: Exception) {}
+
+        return false
+    }
+
+    // ==================== HELPER: PDF GENERATION ====================
     private fun drawBitmapToA4(doc: PdfDocument, pageNumber: Int, imageBytes: ByteArray) {
         val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size) ?: return
         val pageInfo = PdfDocument.PageInfo.Builder(595, 842, pageNumber).create()
