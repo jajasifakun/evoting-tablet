@@ -239,6 +239,18 @@ class DatabaseHelper {
     };
   }
 
+  Future<Map<String, dynamic>?> getVoterByToken(String tokenCode) async {
+    final db = await instance.database;
+    final res = await db.rawQuery('''
+      SELECT v.name, v.nik
+      FROM voter_tokens vt
+      JOIN voters v ON vt.voter_id = v.id
+      WHERE vt.token_code = ?
+      LIMIT 1
+    ''', [tokenCode.trim()]);
+    return res.isNotEmpty ? res.first : null;
+  }
+
   Future<Map<String, dynamic>> castVote(String tokenCode, int candidateId) async {
     final db = await instance.database;
 

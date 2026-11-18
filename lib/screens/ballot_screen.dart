@@ -145,6 +145,17 @@ class _BallotScreenState extends State<BallotScreen> {
     if (result['success'] == true) {
       final voteHash = result['voteHash'] as String? ?? 'HASH-OK';
 
+      // Pastikan data nama & NIK pemilih lengkap untuk dicetak di struk
+      String? vName = widget.voter?.name;
+      String? vNik = widget.voter?.nik;
+      if (vNik == null || vNik.isEmpty) {
+        final voterData = await DatabaseHelper.instance.getVoterByToken(widget.token.tokenCode);
+        if (voterData != null) {
+          vName ??= voterData['name']?.toString();
+          vNik ??= voterData['nik']?.toString();
+        }
+      }
+
       // 1. Kirim cetak otomatis ke Printer Thermal (Kabel USB atau Bluetooth)
       if (ThermalPrinterService.instance.autoPrintEnabled) {
         ThermalPrinterService.instance.printVoteReceipt(
@@ -153,8 +164,8 @@ class _BallotScreenState extends State<BallotScreen> {
           candidateNumber: candidate.orderNumber,
           tokenCode: widget.token.tokenCode,
           voteHash: voteHash,
-          voterName: widget.voter?.name,
-          voterNik: widget.voter?.nik,
+          voterName: vName,
+          voterNik: vNik,
         );
       }
 

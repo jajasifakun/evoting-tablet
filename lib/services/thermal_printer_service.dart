@@ -271,7 +271,7 @@ class ThermalPrinterService {
     );
   }
 
-  /// Pembuat perintah biner ESC/POS standar 58mm / 80mm
+  /// Pembuat perintah biner ESC/POS super hemat kertas & font seragam kecil
   Uint8List generateReceiptBytes({
     required String candidateName,
     required String candidateLetter,
@@ -286,71 +286,56 @@ class ThermalPrinterService {
     // 1. Reset / Inisialisasi printer ESC @
     bytes.addAll([0x1B, 0x40]);
 
-    // 2. Center Align ESC a 1
-    bytes.addAll([0x1B, 0x61, 0x01]);
+    // 2. Set semua ukuran font sama kecil/normal (TIDAK DOUBLE SIZE/HEIGHT)
+    bytes.addAll([0x1B, 0x21, 0x00]); // Standard Font A, normal
+    bytes.addAll([0x1D, 0x21, 0x00]); // Normal Width/Height (1x)
 
-    // Header Double Height & Bold
+    // 3. Header Ringkas (Center Align)
+    bytes.addAll([0x1B, 0x61, 0x01]); // Center
     bytes.addAll([0x1B, 0x45, 0x01]); // Bold ON
-    bytes.addAll([0x1D, 0x21, 0x11]); // Double Height/Width
-    bytes.addAll(utf8.encode("PILKADES 2026\n"));
-    bytes.addAll([0x1D, 0x21, 0x00]); // Normal Size
-    bytes.addAll(utf8.encode("DESA KARANG MUKTI\n"));
+    bytes.addAll(utf8.encode("PILKADES 2026 KARANG MUKTI\n"));
+    bytes.addAll([0x1B, 0x45, 0x00]); // Bold OFF
     bytes.addAll(utf8.encode("KEC. CIPEUNDEUY - SUBANG\n"));
+    bytes.addAll(utf8.encode("--------------------------------\n"));
+    bytes.addAll([0x1B, 0x45, 0x01]); // Bold ON
+    bytes.addAll(utf8.encode("BUKTI FISIK KOTAK SUARA (VVPAT)\n"));
+    bytes.addAll([0x1B, 0x45, 0x00]); // Bold OFF
+    bytes.addAll(utf8.encode("--------------------------------\n"));
+
+    // 4. Data Pemilih & NIK (Left Align)
+    bytes.addAll([0x1B, 0x61, 0x00]); // Left Align
+
+    // Waktu format dd/MM/yy HH:mm:ss WIB (pas 1 baris, tidak terpotong)
+    final now = DateFormat('dd/MM/yy HH:mm:ss').format(DateTime.now());
+    bytes.addAll(utf8.encode("TPS   : TPS 01 KARANG MUKTI\n"));
+    bytes.addAll(utf8.encode("WAKTU : $now WIB\n"));
+
+    final name = (voterName != null && voterName.isNotEmpty) ? voterName : 'PEMILIH';
+    bytes.addAll(utf8.encode("NAMA  : $name\n"));
+
+    final nik = (voterNik != null && voterNik.isNotEmpty) ? voterNik : '-';
+    bytes.addAll(utf8.encode("NIK   : $nik\n"));
+
+    bytes.addAll(utf8.encode("TOKEN : $tokenCode\n"));
+    bytes.addAll(utf8.encode("--------------------------------\n"));
+
+    // 5. Pilihan Tercatat (Center Align, Font Seragam Kecil)
+    bytes.addAll([0x1B, 0x61, 0x01]); // Center Align
+    bytes.addAll([0x1B, 0x45, 0x01]); // Bold ON
+    bytes.addAll(utf8.encode("PILIHAN TERCATAT:\n"));
+    bytes.addAll(utf8.encode("CALON $candidateLetter (No. $candidateNumber)\n"));
+    bytes.addAll([0x1B, 0x45, 0x00]); // Bold OFF
+    bytes.addAll(utf8.encode("$candidateName\n"));
+    bytes.addAll(utf8.encode("--------------------------------\n"));
+
+    // 6. Petunjuk Singkat 1 Baris
+    bytes.addAll([0x1B, 0x45, 0x01]); // Bold ON
+    bytes.addAll(utf8.encode("MASUKKAN KE KOTAK SUARA FISIK\n"));
     bytes.addAll([0x1B, 0x45, 0x00]); // Bold OFF
 
-    bytes.addAll(utf8.encode("================================\n"));
-    bytes.addAll([0x1B, 0x45, 0x01]);
-    bytes.addAll(utf8.encode("BUKTI PEMUNGUTAN SUARA BILIK\n"));
-    bytes.addAll(utf8.encode("(KERTAS KOTAK SUARA FISIK)\n"));
-    bytes.addAll([0x1B, 0x45, 0x00]);
-    bytes.addAll(utf8.encode("--------------------------------\n"));
-
-    // 3. Left Align ESC a 0
-    bytes.addAll([0x1B, 0x61, 0x00]);
-
-    final now = DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now());
-    bytes.addAll(utf8.encode("TPS      : TPS 01 KARANG MUKTI\n"));
-    bytes.addAll(utf8.encode("WAKTU    : $now WIB\n"));
-    bytes.addAll(utf8.encode("TOKEN QR : $tokenCode\n"));
-    if (voterName != null && voterName.isNotEmpty) {
-      bytes.addAll(utf8.encode("PEMILIH  : $voterName\n"));
-    }
-    bytes.addAll(utf8.encode("STATUS   : SUARA SAH TERCATAT\n"));
-    bytes.addAll(utf8.encode("--------------------------------\n"));
-
-    // 4. Center Align untuk pilihan
-    bytes.addAll([0x1B, 0x61, 0x01]);
-    bytes.addAll([0x1B, 0x45, 0x01]);
-    bytes.addAll(utf8.encode("PILIHAN TERCATAT:\n\n"));
-    bytes.addAll([0x1D, 0x21, 0x11]); // Double Size
-    bytes.addAll(utf8.encode("CALON $candidateLetter\n"));
-    bytes.addAll(utf8.encode("(No. $candidateNumber)\n"));
-    bytes.addAll([0x1D, 0x21, 0x00]); // Normal
-    bytes.addAll(utf8.encode("$candidateName\n\n"));
-    bytes.addAll([0x1B, 0x45, 0x00]);
-
-    // Audit Hash
-    bytes.addAll(utf8.encode("--------------------------------\n"));
-    bytes.addAll(utf8.encode("KODE VERIFIKASI DIGITAL:\n"));
-    final shortHash = voteHash.length > 24 ? '${voteHash.substring(0, 12)}...${voteHash.substring(voteHash.length - 12)}' : voteHash;
-    bytes.addAll([0x1B, 0x45, 0x01]);
-    bytes.addAll(utf8.encode("$shortHash\n"));
-    bytes.addAll([0x1B, 0x45, 0x00]);
-
-    // Petunjuk Kotak Suara
-    bytes.addAll(utf8.encode("================================\n"));
-    bytes.addAll([0x1B, 0x45, 0x01]);
-    bytes.addAll(utf8.encode("*** INSTRUKSI PEMILIH ***\n"));
-    bytes.addAll(utf8.encode("SOBEK STRUK BUKTI INI LALU\n"));
-    bytes.addAll(utf8.encode("MASUKKAN KE DALAM KOTAK SUARA\n"));
-    bytes.addAll(utf8.encode("FISIK SEBELUM KELUAR BILIK!\n"));
-    bytes.addAll([0x1B, 0x45, 0x00]);
-    bytes.addAll(utf8.encode("================================\n"));
-    bytes.addAll(utf8.encode("Terima Kasih Atas Partisipasi\nDalam Pilkades Karang Mukti 2026\n\n"));
-
-    // 5. Feed kertas 4 baris & pemotong (GS V 0)
-    bytes.addAll([0x0A, 0x0A, 0x0A, 0x0A]);
-    bytes.addAll([0x1D, 0x56, 0x00]);
+    // 7. Feed minimal 2 baris saja lalu potong (sangat hemat kertas)
+    bytes.addAll([0x0A, 0x0A]);
+    bytes.addAll([0x1D, 0x56, 0x00]); // Cut
 
     return Uint8List.fromList(bytes);
   }
