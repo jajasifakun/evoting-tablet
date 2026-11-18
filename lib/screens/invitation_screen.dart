@@ -401,14 +401,11 @@ class _InvitationScreenState extends State<InvitationScreen> {
     final tokenCode = item['token_code'] ?? 'KM2026-TEST-VOTE01';
     final dptNo = item['dpt_no'] ?? item['id'] ?? (index + 1);
 
-    // Dynamic TPS, Alamat, Bilik Suara
+    // Dynamic TPS & Bilik Suara, Alamat TPS Tetap (Ciomas RT 09 RW 05)
     final rawTps = item['tps_no'] ?? item['tps'] ?? '1';
     final formattedTps = rawTps.toString().toUpperCase().contains('TPS') ? rawTps.toString() : 'TPS $rawTps';
 
-    final rawAddress = item['address'] ?? item['tps_address'];
-    final formattedAddress = (rawAddress != null && rawAddress.toString().trim().isNotEmpty)
-        ? rawAddress.toString().trim()
-        : 'Jalan Merak Ngibing Nomor 12';
+    const formattedAddress = 'Ciomas RT 09 RW 05';
 
     final rawBilik = item['bilik_no'] ?? item['bilik'] ?? '1';
     final formattedBilik = rawBilik.toString().toLowerCase().contains('bilik')
