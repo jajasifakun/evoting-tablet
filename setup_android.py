@@ -677,6 +677,12 @@ class MainActivity: FlutterActivity() {
         // Coba simpan ke folder publik Downloads jika diizinkan OS
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} = ?"
+                    val selectionArgs = arrayOf(safeFileName)
+                    contentResolver.delete(MediaStore.Downloads.EXTERNAL_CONTENT_URI, selection, selectionArgs)
+                } catch (_: Exception) {}
+
                 val values = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, safeFileName)
                     put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")

@@ -14,6 +14,7 @@ class InvitationScreen extends StatefulWidget {
 
 class _InvitationScreenState extends State<InvitationScreen> {
   final GlobalKey _cardKey = GlobalKey();
+  final ScrollController _scrollController = ScrollController();
   List<Map<String, dynamic>> _voterCards = [];
   bool _isLoading = true;
   bool _isDownloading = false;
@@ -23,6 +24,12 @@ class _InvitationScreenState extends State<InvitationScreen> {
   void initState() {
     super.initState();
     _loadVoterTokens();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadVoterTokens() async {
@@ -39,8 +46,11 @@ class _InvitationScreenState extends State<InvitationScreen> {
     setState(() => _isDownloading = true);
 
     try {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
       await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 150));
+      await Future.delayed(const Duration(milliseconds: 200));
 
       final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) throw Exception("Komponen kartu belum siap");
@@ -133,6 +143,9 @@ class _InvitationScreenState extends State<InvitationScreen> {
     setState(() => _isDownloading = true);
 
     try {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
       final fileName = 'Surat_Undangan_C6_Semua_${_voterCards.length}_Pemilih.pdf';
       final started = await ThermalPrinterService.instance.startMultiPagePdf(fileName);
       if (!started) throw Exception("Gagal menginisialisasi dokumen PDF multi-halaman");
@@ -141,7 +154,7 @@ class _InvitationScreenState extends State<InvitationScreen> {
       for (int i = 0; i < _voterCards.length; i++) {
         setState(() => _selectedIndex = i);
         await WidgetsBinding.instance.endOfFrame;
-        await Future.delayed(const Duration(milliseconds: 120));
+        await Future.delayed(const Duration(milliseconds: 150));
 
         final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
         if (boundary != null) {
@@ -283,121 +296,214 @@ class _InvitationScreenState extends State<InvitationScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _voterCards.isEmpty
               ? const Center(child: Text('Tidak ada data DPT.'))
-              : Row(
-                  children: [
-                    // Sisi Kiri: Daftar 10 Pemilih
-                    Container(
-                      width: 260,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border(right: BorderSide(color: Colors.grey.shade300)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final bool isNarrow = constraints.maxWidth < 750;
+                    if (isNarrow) {
+                      return Column(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(12),
-                            color: Colors.indigo.shade50,
-                            child: Row(
+                            color: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Icon(Icons.people, color: Colors.indigo.shade800, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Pilih Pemilih (${_voterCards.length} DPT)',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo.shade900, fontSize: 13),
+                                DropdownButtonFormField<int>(
+                                  value: _selectedIndex,
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    labelText: 'Pilih Pemilih (${_voterCards.length} DPT)',
+                                    labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    prefixIcon: const Icon(Icons.person, color: Colors.indigo),
+                                  ),
+                                  items: List.generate(_voterCards.length, (idx) {
+                                    final v = _voterCards[idx];
+                                    final name = v['voter_name'] ?? 'Pemilih ${idx + 1}';
+                                    final nik = v['voter_nik'] ?? '-';
+                                    return DropdownMenuItem<int>(
+                                      value: idx,
+                                      child: Text(
+                                        '${idx + 1}. $name (NIK: $nik)',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                      ),
+                                    );
+                                  }),
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _selectedIndex = val);
+                                  },
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.indigo.shade700,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(vertical: 11),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                        icon: const Icon(Icons.picture_as_pdf, size: 16),
+                                        label: const Text('Download Surat Ini (PDF)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
+                                        onPressed: _isDownloading ? null : _downloadCurrentPdf,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.indigo.shade800,
+                                          padding: const EdgeInsets.symmetric(vertical: 11),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                        icon: const Icon(Icons.file_copy, size: 16),
+                                        label: Text('Download Semua (${_voterCards.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
+                                        onPressed: _isDownloading ? null : _downloadAllPdf,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           ),
                           Expanded(
-                            child: ListView.separated(
-                              itemCount: _voterCards.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1),
-                              itemBuilder: (ctx, idx) {
-                                final item = _voterCards[idx];
-                                final isSelected = idx == _selectedIndex;
-                                return ListTile(
-                                  dense: true,
-                                  selected: isSelected,
-                                  selectedTileColor: Colors.indigo.shade100,
-                                  leading: CircleAvatar(
-                                    radius: 14,
-                                    backgroundColor: isSelected ? Colors.indigo : Colors.grey.shade300,
-                                    foregroundColor: isSelected ? Colors.white : Colors.black87,
-                                    child: Text('${idx + 1}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                  ),
-                                  title: Text(
-                                    item['voter_name'] ?? 'Pemilih Lepas',
-                                    style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.w600, fontSize: 13),
-                                  ),
-                                  subtitle: Text(
-                                    item['token_code'] ?? '',
-                                    style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: Colors.grey),
-                                  ),
-                                  onTap: () => setState(() => _selectedIndex = idx),
-                                );
-                              },
+                            child: SingleChildScrollView(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.all(16),
+                              child: Center(
+                                child: _buildCardPreviewWithKey(),
+                              ),
                             ),
                           ),
                         ],
-                      ),
-                    ),
+                      );
+                    }
 
-                    // Sisi Kanan: Lembar Preview Surat Undangan Resmi
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 620),
-                            child: Column(
-                              children: [
-                                // Tombol Download Cepat
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                    return Row(
+                      children: [
+                        // Sisi Kiri: Daftar Pemilih
+                        Container(
+                          width: 260,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border(right: BorderSide(color: Colors.grey.shade300)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                color: Colors.indigo.shade50,
+                                child: Row(
                                   children: [
-                                    ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.indigo.shade700,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      ),
-                                      icon: const Icon(Icons.picture_as_pdf, size: 18),
-                                      label: const Text('Download Surat Ini (PDF)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                      onPressed: _isDownloading ? null : _downloadCurrentPdf,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.indigo.shade800,
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      ),
-                                      icon: const Icon(Icons.file_copy, size: 18),
-                                      label: Text('Download Semua ${_voterCards.length} Surat (PDF)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                      onPressed: _isDownloading ? null : _downloadAllPdf,
+                                    Icon(Icons.people, color: Colors.indigo.shade800, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Pilih Pemilih (${_voterCards.length} DPT)',
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo.shade900, fontSize: 13),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 14),
-
-                                // Kartu Undangan yang Ditangkap untuk Download
-                                SizedBox(
-                                  width: 580,
-                                  child: RepaintBoundary(
-                                    key: _cardKey,
-                                    child: _buildInvitationCard(_voterCards[_selectedIndex], _selectedIndex),
-                                  ),
+                              ),
+                              Expanded(
+                                child: ListView.separated(
+                                  itemCount: _voterCards.length,
+                                  separatorBuilder: (_, __) => const Divider(height: 1),
+                                  itemBuilder: (ctx, idx) {
+                                    final item = _voterCards[idx];
+                                    final isSelected = idx == _selectedIndex;
+                                    return ListTile(
+                                      dense: true,
+                                      selected: isSelected,
+                                      selectedTileColor: Colors.indigo.shade100,
+                                      leading: CircleAvatar(
+                                        radius: 14,
+                                        backgroundColor: isSelected ? Colors.indigo : Colors.grey.shade300,
+                                        foregroundColor: isSelected ? Colors.white : Colors.black87,
+                                        child: Text('${idx + 1}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ),
+                                      title: Text(
+                                        item['voter_name'] ?? 'Pemilih Lepas',
+                                        style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.w600, fontSize: 13),
+                                      ),
+                                      subtitle: Text(
+                                        item['token_code'] ?? '',
+                                        style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: Colors.grey),
+                                      ),
+                                      onTap: () => setState(() => _selectedIndex = idx),
+                                    );
+                                  },
                                 ),
-                              ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Sisi Kanan: Lembar Preview Surat Undangan Resmi
+                        Expanded(
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(20),
+                            child: Center(
+                              child: Column(
+                                children: [
+                                  // Tombol Download Cepat
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.indigo.shade700,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        icon: const Icon(Icons.picture_as_pdf, size: 18),
+                                        label: const Text('Download Surat Ini (PDF)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                        onPressed: _isDownloading ? null : _downloadCurrentPdf,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.indigo.shade800,
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        icon: const Icon(Icons.file_copy, size: 18),
+                                        label: Text('Download Semua ${_voterCards.length} Surat (PDF)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                        onPressed: _isDownloading ? null : _downloadAllPdf,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 14),
+
+                                  // Kartu Undangan yang Ditangkap untuk Download
+                                  _buildCardPreviewWithKey(),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
+    );
+  }
+
+  Widget _buildCardPreviewWithKey() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SizedBox(
+        width: 580,
+        child: RepaintBoundary(
+          key: _cardKey,
+          child: _buildInvitationCard(_voterCards[_selectedIndex], _selectedIndex),
+        ),
+      ),
     );
   }
 
