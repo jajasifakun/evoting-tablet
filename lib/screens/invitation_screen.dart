@@ -39,10 +39,13 @@ class _InvitationScreenState extends State<InvitationScreen> {
     setState(() => _isDownloading = true);
 
     try {
+      await WidgetsBinding.instance.endOfFrame;
+      await Future.delayed(const Duration(milliseconds: 150));
+
       final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) throw Exception("Komponen kartu belum siap");
 
-      final image = await boundary.toImage(pixelRatio: 2.5);
+      final image = await boundary.toImage(pixelRatio: 2.2);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) throw Exception("Gagal menghasilkan gambar kartu");
       final bytes = byteData.buffer.asUint8List();
@@ -262,13 +265,13 @@ class _InvitationScreenState extends State<InvitationScreen> {
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'all',
                 child: Row(
                   children: [
-                    Icon(Icons.file_copy, color: Colors.green, size: 20),
-                    SizedBox(width: 8),
-                    Text('Download Semua 10 Surat (PDF)'),
+                    const Icon(Icons.file_copy, color: Colors.green, size: 20),
+                    const SizedBox(width: 8),
+                    Text('Download Semua ${_voterCards.length} Surat (PDF)'),
                   ],
                 ),
               ),
@@ -380,9 +383,12 @@ class _InvitationScreenState extends State<InvitationScreen> {
                                 const SizedBox(height: 14),
 
                                 // Kartu Undangan yang Ditangkap untuk Download
-                                RepaintBoundary(
-                                  key: _cardKey,
-                                  child: _buildInvitationCard(_voterCards[_selectedIndex], _selectedIndex),
+                                SizedBox(
+                                  width: 580,
+                                  child: RepaintBoundary(
+                                    key: _cardKey,
+                                    child: _buildInvitationCard(_voterCards[_selectedIndex], _selectedIndex),
+                                  ),
                                 ),
                               ],
                             ),
@@ -416,6 +422,7 @@ class _InvitationScreenState extends State<InvitationScreen> {
     final printTime = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
 
     return Container(
+      width: 580,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
